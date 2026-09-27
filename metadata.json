@@ -1,0 +1,8 @@
+{
+  "name": "FOCUSO - Muslim Planner",
+  "description": "Premium Islamic planner and journal balancing deen and dunya with structured daily, weekly, and monthly tracking.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,113 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --color-green: #377f62;
+  --color-deep: #285e49;
+  --color-ink: #323232;
+  --color-soft-green: #eaf2ee;
+  --color-cream: #F0EAC0;
+  --color-white-soft: #f8f8f8;
+
+  --font-serif: 'DM Serif Display', Georgia, serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-bn-serif: 'Noto Serif Bengali', serif;
+  --font-bn-sans: 'Noto Sans Bengali', sans-serif;
+}
+
+:root {
+  --color-cream: #F0EAC0;
+  color-scheme: light;
+}
+
+/* Dark mode remapping for Warm Cream token */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-cream: #2A2820;
+  }
+}
+
+:root[class~='dark'],
+[data-theme='dark'],
+.dark {
+  --color-cream: #2A2820;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 88px;
+}
+
+body {
+  margin: 0;
+  background: var(--color-white-soft);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ink-derived neutrals per brand guidelines */
+.text-ink-60 { color: rgba(50, 50, 50, 0.66); }
+.text-ink-45 { color: rgba(50, 50, 50, 0.5); }
+.border-ink-15 { border-color: rgba(50, 50, 50, 0.14); }
+.bg-ink-04 { background: rgba(50, 50, 50, 0.035); }
+
+.font-serif { font-family: var(--font-serif); }
+.bn { font-family: var(--font-bn-sans); }
+.bn-serif { font-family: var(--font-bn-serif); line-height: 1.6; }
+
+/* ---- Bilingual typography ----
+   When Bangla is active, remap the type system to the Bengali faces and
+   give the script the extra vertical breathing room it needs. Latin
+   tracking is neutralised — letter-spacing does not belong on Bangla. */
+html[data-lang='bn'] body {
+  font-family: var(--font-bn-sans);
+  line-height: 1.8;
+}
+html[data-lang='bn'] .font-serif {
+  font-family: var(--font-bn-serif);
+  line-height: 1.28;
+}
+html[data-lang='bn'] [class*='tracking-'] {
+  letter-spacing: 0 !important;
+}
+/* SectionLabel uppercasing is meaningless for Bangla — keep it natural. */
+html[data-lang='bn'] .uppercase {
+  text-transform: none;
+}
+/* FOCUSO is a brand mark: it always stays in the Latin display face. */
+.wordmark-en { font-family: var(--font-serif) !important; }
+html[data-lang='bn'] .wordmark-en { letter-spacing: 0.02em !important; }
+
+/* Focus states */
+*:focus-visible {
+  outline: 2px solid var(--color-green);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+::selection {
+  background: var(--color-soft-green);
+  color: var(--color-deep);
+}
+
+/* Hide scrollbars until scrolling */
+* {
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+@keyframes focuso-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade { animation: focuso-fade 0.5s ease both; }

@@ -1,0 +1,10 @@
+{
+  "description": "Connect with others through seamless messaging and collaboration tools designed for individuals and teams to enhance communication and productivity.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
