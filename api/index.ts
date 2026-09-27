@@ -1,5 +1,6 @@
 // Vercel Function entrypoint for the existing Express API.
-// Importing the app does not call app.listen(); Vercel owns the HTTP lifecycle.
-import app from '../server'
+// Keep the extension explicit: this project also has a server/ directory, and
+// extensionless ESM resolution on Vercel would otherwise target that directory.
+import app from '../server.ts'
 
 export default app
