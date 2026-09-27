@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import { getSupabaseAdmin } from '../lib/supabaseAdmin'
+import { requireIsolatedSupabaseIntegrationTest } from '../test/integrationGuard'
 
 const BASE_URL = 'http://localhost:3000'
+
+requireIsolatedSupabaseIntegrationTest('orders.test.ts')
 
 async function runStep6ATests() {
   console.log('Starting FOCUSO Step 6A Comprehensive Order API Tests...\n')

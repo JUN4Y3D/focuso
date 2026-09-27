@@ -1,362 +1,62 @@
-import { useState } from 'react'
-import { Button, SectionLabel, IconArrow, IconCheck, IconMinus, IconPlus, IconChevron, Wordmark } from './primitives'
+import { useState, type ReactNode } from 'react'
+import { Button, SectionLabel, IconArrow, IconChevron, IconMinus, IconPlus, Wordmark } from './primitives'
 import { MonthlyPage, WeeklyPage, DailyPage } from './PlannerPages'
 import { useLang } from '../i18n'
 
-const img = (id: string, w: number, h: number) =>
-  `https://images.unsplash.com/photo-${id}?w=${w}&h=${h}&fit=crop&auto=format&q=80`
-
-/* Premium presentation of the real planner pages: front page with a second
-   page offset behind. Border + tonal surface, no drop shadow (brand §16). */
-function PlannerStack({ front, behind }: { front: React.ReactNode; behind: React.ReactNode }) {
-  return (
-    <div className="relative mx-auto w-full max-w-[340px]">
-      <div className="absolute right-[-9%] top-[7%] w-[80%] rotate-[4.5deg] rounded-[10px] border border-ink-15 overflow-hidden bg-white opacity-85 hidden sm:block">
-        {behind}
-      </div>
-      <div className="relative rounded-[10px] border border-ink-15 overflow-hidden bg-white">
-        {front}
-      </div>
-    </div>
-  )
+function PlannerStack({ front, behind, className = '' }: { front: ReactNode; behind: ReactNode; className?: string }) {
+  return <div className={`relative mx-auto w-full max-w-[320px] ${className}`}><div className="absolute right-[-8%] top-[6%] w-[84%] rotate-[3.5deg] overflow-hidden rounded-[8px] border border-ink-15 bg-white opacity-70">{behind}</div><div className="relative overflow-hidden rounded-[8px] border border-ink-15 bg-white shadow-[0_8px_18px_rgba(40,52,46,0.10)]">{front}</div></div>
 }
 
-/* ---------- SECTION 01 — HERO ---------- */
 function Hero({ onOrder }: { onOrder: () => void }) {
   const { t } = useLang()
-  return (
-    <section className="mx-auto max-w-[1320px] px-6 md:px-10 pt-10 md:pt-16 pb-20 md:pb-28">
-      <div className="grid lg:grid-cols-[1.05fr_0.95fr] gap-10 lg:gap-16 items-center">
-        <div className="animate-fade">
-          <SectionLabel>{t.hero.label}</SectionLabel>
-          <h1 className="font-serif mt-6 text-[clamp(44px,7vw,76px)] leading-[1.04] tracking-[-0.01em]">
-            {t.hero.title1}<br />{t.hero.title2}
-          </h1>
-          <p className="mt-5 font-serif italic text-[clamp(18px,2.4vw,24px)] leading-[1.3] text-green">
-            {t.hero.tagline}
-          </p>
-          <p className="mt-6 text-[18px] leading-[1.7] text-ink-60 max-w-[30rem]">
-            {t.hero.body}
-          </p>
-          <div className="mt-9 flex flex-wrap items-center gap-5">
-            <Button onClick={onOrder}>{t.hero.order}</Button>
-            <a href="#inside" className="inline-flex items-center gap-2 text-[16px] font-semibold text-ink hover:text-green transition-colors">
-              {t.hero.explore} <IconArrow />
-            </a>
-          </div>
-        </div>
-
-        <div className="relative">
-          <div className="rounded-[16px] bg-soft-green px-6 py-10 md:px-10 md:py-14">
-            <PlannerStack
-              front={<DailyPage className="w-full h-auto" />}
-              behind={<MonthlyPage className="w-full h-auto" />}
-            />
-          </div>
-          <div className="hidden md:flex absolute -bottom-5 -left-5 bg-cream border border-ink-15 rounded-[12px] px-5 py-4 gap-6">
-            {t.hero.stats.map(([a, b]) => (
-              <div key={b}>
-                <div className="font-serif text-[22px] leading-none text-deep">{a}</div>
-                <div className="text-[12px] text-ink-60 mt-1">{b}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  )
+  return <section className="home-hero focuso-container pb-16 pt-10 md:pb-24 md:pt-14"><div className="grid items-center gap-12 lg:grid-cols-[0.96fr_0.84fr] lg:gap-24"><div className="max-w-[34rem] animate-fade"><SectionLabel>{t.hero.label}</SectionLabel><h1 className="font-serif mt-5 text-[clamp(42px,5.3vw,68px)] leading-[1.02] tracking-[-0.035em] text-ink">{t.hero.tagline}</h1><p className="font-serif mt-4 text-[clamp(19px,2.1vw,25px)] italic leading-[1.25] text-green">{t.hero.title1} {t.hero.title2}</p><p className="mt-5 max-w-[31rem] text-[15px] leading-[1.7] text-ink-60 md:text-[16px]">{t.hero.body}</p><div className="mt-7 flex flex-wrap items-center gap-x-5 gap-y-3"><Button onClick={onOrder} className="focuso-button px-5 py-3 text-[14px]">{t.hero.order}</Button><a href="#inside" className="inline-flex items-center gap-2 text-[13px] font-semibold text-ink transition-colors hover:text-green">{t.hero.explore} <IconArrow className="h-4 w-4" /></a></div></div><div className="relative mx-auto w-full max-w-[430px]"><div className="rounded-[13px] bg-soft-green p-8 sm:p-11"><PlannerStack front={<DailyPage />} behind={<MonthlyPage />} /></div><div className="hero-plaque absolute -bottom-3 left-0 flex rounded-[6px] border border-[#dfd9ac] bg-cream px-3 py-2.5 shadow-[0_4px_8px_rgba(40,52,46,0.05)] sm:-left-2">{t.hero.stats.map(([stat, label]) => <div key={label} className="border-r border-[#d9d2a1] px-3 last:border-0 first:pl-0 last:pr-0"><span className="block font-serif text-[16px] leading-none text-deep">{stat}</span><span className="mt-1 block text-[9px] leading-none text-ink-60">{label}</span></div>)}</div></div></div></section>
 }
 
-/* ---------- SECTION 02 — TENSION ---------- */
-function Tension() {
+function Problem() {
   const { t } = useLang()
-  const scattered = t.tension.cards
-  return (
-    <section className="border-y border-ink-15 bg-white-soft">
-      <div className="mx-auto max-w-[1320px] px-6 md:px-10 py-20 md:py-28 grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
-        <div>
-          <h2 className="font-serif text-[clamp(32px,4.5vw,44px)] leading-[1.12]">
-            {t.tension.heading}
-          </h2>
-          <p className="mt-6 text-[18px] leading-[1.7] text-ink-60 max-w-[34rem]">
-            {t.tension.body1}
-          </p>
-          <p className="mt-5 text-[18px] leading-[1.7] text-ink max-w-[34rem]">
-            {t.tension.body2}
-          </p>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-4">
-          {scattered.map((t, i) => (
-            <div
-              key={t}
-              className="rounded-[12px] border border-ink-15 bg-ink-04 px-5 py-6 text-[15px] text-ink-60"
-              style={{ transform: `rotate(${[-1.5, 1, 1.5, -1][i]}deg)` }}
-            >
-              {t}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
+  return <section className="border-y border-ink-15"><div className="focuso-container py-20 text-center md:py-28"><h2 className="mx-auto max-w-[42rem] font-serif text-[clamp(29px,3.7vw,46px)] leading-[1.08] tracking-[-0.025em]">{t.tension.heading}</h2><p className="mx-auto mt-5 max-w-[39rem] text-[14px] leading-[1.75] text-ink-60 md:text-[15px]">{t.tension.body1}</p></div></section>
 }
 
-/* ---------- SECTION 03 — SHOW THE SYSTEM ---------- */
 function System() {
-  const { t } = useLang()
-  const pages = [MonthlyPage, WeeklyPage, DailyPage]
-  const nums = ['01', '02', '03']
-  const steps = t.system.steps.map((s, i) => ({ n: nums[i], label: s.label, body: s.body, Page: pages[i] }))
-  return (
-    <section id="how" className="mx-auto max-w-[1320px] px-6 md:px-10 py-20 md:py-28">
-      <div className="max-w-[40rem]">
-        <SectionLabel>{t.system.label}</SectionLabel>
-        <h2 className="font-serif mt-5 text-[clamp(32px,4.5vw,44px)] leading-[1.12]">
-          {t.system.heading}
-        </h2>
-        <p className="mt-6 text-[18px] leading-[1.7] text-ink-60">
-          {t.system.body}
-        </p>
-      </div>
-
-      <div className="mt-14 grid md:grid-cols-3 gap-x-8 gap-y-12">
-        {steps.map(({ n, label, body, Page }, i) => (
-          <div key={n} className="relative">
-            <div className="rounded-[14px] bg-soft-green p-5">
-              <div className="rounded-[10px] border border-ink-15 overflow-hidden bg-white">
-                <Page className="w-full h-auto" />
-              </div>
-            </div>
-            <div className="mt-6 flex items-baseline gap-3">
-              <span className="font-serif text-[22px] text-green">{n}</span>
-              <h3 className="text-[20px] font-semibold">{label}</h3>
-            </div>
-            <p className="mt-2 text-[16px] leading-[1.6] text-ink-60">{body}</p>
-            {i < steps.length - 1 && (
-              <div className="hidden md:block absolute top-[30%] -right-4 text-ink-45"><IconArrow className="w-6 h-6" /></div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-12 rounded-r-[10px] border-l-4 border-deep bg-cream p-5 text-[16px] leading-[1.6] text-ink max-w-[44rem]">
-        <p className="font-medium text-ink">{t.habitTracker.compound}</p>
-      </div>
-    </section>
-  )
+  const { t } = useLang(); const pages = [MonthlyPage, WeeklyPage, DailyPage]
+  return <section id="how" className="focuso-container py-20 md:py-28"><div className="max-w-[38rem]"><SectionLabel>{t.system.label}</SectionLabel><h2 className="font-serif mt-4 text-[clamp(30px,3.8vw,46px)] leading-[1.08] tracking-[-0.025em]">{t.system.heading}</h2><p className="mt-5 text-[14px] leading-[1.75] text-ink-60 md:text-[15px]">{t.system.body}</p></div><div id="inside" className="planner-grid mt-12 grid gap-9 md:grid-cols-3 md:gap-7">{t.system.steps.map((step, index) => { const Page = pages[index]; return <div key={step.label} className="relative"><div className="rounded-[8px] border border-ink-15 bg-white p-3 shadow-[0_7px_16px_rgba(40,52,46,0.08)]"><div className="overflow-hidden rounded-[4px] border border-ink-15"><Page /></div></div>{index < 2 && <IconArrow className="absolute right-[-28px] top-[42%] hidden h-5 w-5 text-ink-45 md:block" />}<div className="mt-4 flex gap-2.5"><span className="text-[11px] font-semibold text-green">0{index + 1}</span><div><h3 className="text-[14px] font-semibold text-ink">{step.label}</h3><p className="mt-1 text-[12px] leading-[1.55] text-ink-60">{step.body}</p></div></div></div>})}</div></section>
 }
 
-/* ---------- SECTION 04 — 60-DAY IDEA ---------- */
+function HabitGrowth() {
+  const { t } = useLang()
+  return <section className="home-habit bg-soft-green/80"><div className="focuso-container grid items-center gap-12 py-20 md:grid-cols-[0.9fr_1.1fr] md:py-24 lg:gap-24"><div className="mx-auto w-full max-w-[300px] rounded-[8px] border border-ink-15 bg-white p-3 shadow-[0_8px_18px_rgba(40,52,46,0.10)]"><div className="overflow-hidden rounded-[4px] border border-ink-15"><WeeklyPage /></div></div><div className="max-w-[31rem]"><SectionLabel>{t.habitTracker.label}</SectionLabel><h2 className="font-serif mt-4 text-[clamp(30px,3.6vw,43px)] leading-[1.08] tracking-[-0.025em]">{t.habitTracker.heading}</h2><p className="mt-5 text-[14px] leading-[1.75] text-ink-60 md:text-[15px]">{t.habitTracker.body}</p><p className="habit-highlight mt-6 rounded-[5px] border-l-[3px] border-deep bg-cream px-4 py-3 font-serif text-[13px] font-semibold leading-[1.45] text-deep">{t.habitTracker.compound}</p></div></div></section>
+}
+
 function SixtyDay() {
   const { t } = useLang()
-  const points = t.sixtyDay.points
-  return (
-    <section className="border-y border-ink-15 bg-cream/45">
-      <div className="mx-auto max-w-[1320px] px-6 md:px-10 py-20 md:py-28 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-        <div className="rounded-[16px] overflow-hidden bg-soft-green aspect-[5/4] order-last lg:order-first">
-          <img
-            src={img('1689525970033-948720b0ccf8', 1000, 800)}
-            alt={t.sixtyDay.alt}
-            className="w-full h-full object-cover"
-          />
-        </div>
-        <div>
-          <SectionLabel>{t.sixtyDay.label}</SectionLabel>
-          <h2 className="font-serif mt-5 text-[clamp(32px,4.5vw,44px)] leading-[1.12]">
-            {t.sixtyDay.heading}
-          </h2>
-          <p className="mt-6 text-[18px] leading-[1.7] text-ink-60 max-w-[34rem]">
-            {t.sixtyDay.body}
-          </p>
-          <ul className="mt-8 space-y-3">
-            {points.map((p) => (
-              <li key={p} className="flex items-start gap-3 text-[16px] text-ink">
-                <span className="mt-0.5 text-green shrink-0"><IconCheck /></span>{p}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </section>
-  )
+  return <section className="focuso-container py-20 md:py-28"><div className="sixty-panel mx-auto max-w-[760px] rounded-[12px] border border-[#e6dfb5] bg-cream px-7 py-14 text-center md:px-14 md:py-16"><SectionLabel>{t.sixtyDay.label}</SectionLabel><h2 className="font-serif mt-4 text-[clamp(30px,3.7vw,45px)] leading-[1.08] tracking-[-0.025em] text-deep">{t.sixtyDay.heading}</h2><p className="mx-auto mt-5 max-w-[35rem] text-[14px] leading-[1.75] text-ink-60 md:text-[15px]">{t.sixtyDay.body}</p></div></section>
 }
 
-/* ---------- SECTION 06 — PRODUCT DETAILS ---------- */
-function Details() {
-  const { t } = useLang()
-  const confirmed = t.details.confirmed
-  const placeholders = t.details.placeholders
-  return (
-    <section className="mx-auto max-w-[1320px] px-6 md:px-10 py-20 md:py-28">
-      <div className="grid lg:grid-cols-[0.8fr_1.2fr] gap-12 lg:gap-16">
-        <div>
-          <SectionLabel>{t.details.label}</SectionLabel>
-          <h2 className="font-serif mt-5 text-[clamp(30px,4vw,40px)] leading-[1.12]">
-            {t.details.heading}
-          </h2>
-          <p className="mt-6 text-[17px] leading-[1.7] text-ink-60 max-w-[26rem]">
-            {t.details.body}
-          </p>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-x-10">
-          <dl>
-            {confirmed.map(([k, v], i) => (
-              <div key={i} className="flex justify-between gap-4 py-3.5 border-b border-ink-15">
-                <dt className="text-[15px] text-ink-60">{k}</dt>
-                <dd className="text-[15px] font-medium text-ink text-right">{v}</dd>
-              </div>
-            ))}
-          </dl>
-          <dl>
-            {placeholders.map(([k, v], i) => (
-              <div key={i} className="flex justify-between gap-4 py-3.5 border-b border-ink-15">
-                <dt className="text-[15px] text-ink-60">{k}</dt>
-                <dd className="text-[15px] text-ink-45 text-right font-mono">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-/* ---------- SECTION 07 — PURCHASE BLOCK ---------- */
 function Purchase({ onOrder, qty, setQty }: { onOrder: () => void; qty: number; setQty: (n: number) => void }) {
-  const { t } = useLang()
-  return (
-    <section id="order" className="bg-white-soft border-t border-ink-15">
-      <div className="mx-auto max-w-[1320px] px-6 md:px-10 py-20 md:py-28 grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-        <div className="rounded-[16px] bg-soft-green px-6 py-12 md:px-10 md:py-16">
-          <PlannerStack
-            front={<DailyPage className="w-full h-auto" />}
-            behind={<WeeklyPage className="w-full h-auto" />}
-          />
-        </div>
-        <div>
-          <SectionLabel>{t.purchase.label}</SectionLabel>
-          <h2 className="font-serif mt-4 text-[clamp(30px,4vw,40px)] leading-[1.12]">
-            {t.purchase.heading}
-          </h2>
-          <p className="mt-4 text-[17px] leading-[1.7] text-ink-60 max-w-[30rem]">
-            {t.purchase.body}
-          </p>
-
-          <div className="mt-8 flex items-baseline gap-3">
-            <span className="font-serif text-[34px] text-ink">{t.purchase.price}</span>
-            <span className="text-[14px] text-ink-45">{t.purchase.priceNote}</span>
-          </div>
-
-          <div className="mt-8 flex flex-wrap items-center gap-6">
-            <div className="inline-flex items-center border border-ink-15 rounded-[10px]">
-              <button
-                onClick={() => setQty(Math.max(1, qty - 1))}
-                className="px-4 py-3 text-ink hover:text-green disabled:opacity-30"
-                disabled={qty <= 1}
-                aria-label="Decrease quantity"
-              ><IconMinus /></button>
-              <span className="w-10 text-center text-[16px] font-semibold tabular-nums">{qty}</span>
-              <button
-                onClick={() => setQty(Math.min(9, qty + 1))}
-                className="px-4 py-3 text-ink hover:text-green"
-                aria-label="Increase quantity"
-              ><IconPlus /></button>
-            </div>
-            <Button onClick={onOrder} className="px-8">{t.purchase.order}</Button>
-          </div>
-
-          <p className="mt-6 text-[14px] text-ink-45">{t.purchase.footnote}</p>
-        </div>
-      </div>
-    </section>
-  )
+  const { t } = useLang(); const details = t.details.confirmed
+  return <section id="order" className="home-order border-t border-ink-15"><div className="focuso-container grid items-center gap-14 py-20 md:grid-cols-[0.92fr_1.08fr] md:py-28 lg:gap-24"><div className="rounded-[9px] border border-ink-15 bg-white p-8 sm:p-11"><PlannerStack front={<DailyPage />} behind={<WeeklyPage />} /></div><div className="max-w-[34rem]"><SectionLabel>{t.purchase.label}</SectionLabel><h2 className="font-serif mt-4 text-[clamp(30px,3.7vw,44px)] leading-[1.08] tracking-[-0.025em]">{t.details.heading}</h2><p className="mt-4 text-[14px] leading-[1.75] text-ink-60 md:text-[15px]">{t.purchase.body}</p><dl className="mt-6 border-t border-ink-15">{details.slice(0, 5).map(([label, value]) => <div key={label} className="flex items-center justify-between gap-5 border-b border-ink-15 py-2 text-[12px]"><dt className="text-ink-60">{label}</dt><dd className="font-medium text-ink">{value}</dd></div>)}</dl><div className="mt-7 flex items-end gap-3"><span className="font-serif text-[32px] leading-none">{t.purchase.price}</span><span className="pb-1 text-[11px] text-ink-45">{t.purchase.priceNote}</span></div><div className="mt-5 flex flex-wrap items-center gap-4"><div className="quantity-control inline-flex h-[39px] items-center rounded-[5px] border border-ink-15 bg-white"><button onClick={() => setQty(Math.max(1, qty - 1))} disabled={qty <= 1} className="px-3 text-ink transition hover:text-green disabled:opacity-30" aria-label="Decrease quantity"><IconMinus className="h-3.5 w-3.5" /></button><span className="w-7 text-center text-[13px] font-semibold tabular-nums">{qty}</span><button onClick={() => setQty(Math.min(9, qty + 1))} disabled={qty >= 9} className="px-3 text-ink transition hover:text-green" aria-label="Increase quantity"><IconPlus className="h-3.5 w-3.5" /></button></div><Button onClick={onOrder} className="focuso-button px-5 py-2.5 text-[13px]">{t.purchase.order}</Button></div><p className="mt-4 text-[10px] text-ink-45">{t.purchase.footnote}</p></div></div></section>
 }
 
-/* ---------- SECTION 08 — FAQ ---------- */
 function FAQ() {
-  const { t } = useLang()
-  const faqs = t.faq.items
-  const [open, setOpen] = useState<number | null>(0)
-  return (
-    <section id="faq" className="mx-auto max-w-[1320px] px-6 md:px-10 py-20 md:py-28">
-      <div className="grid lg:grid-cols-[0.8fr_1.2fr] gap-10 lg:gap-16">
-        <div>
-          <SectionLabel>{t.faq.label}</SectionLabel>
-          <h2 className="font-serif mt-5 text-[clamp(30px,4vw,40px)] leading-[1.12]">
-            {t.faq.heading}
-          </h2>
+  const { t } = useLang(); const [open, setOpen] = useState<number | null>(null)
+  return <section id="faq" className="home-faq border-t border-ink-15">
+    <div className="focuso-container grid gap-10 py-20 md:grid-cols-[0.74fr_1.26fr] md:py-24 lg:gap-20">
+      <div className="faq-intro"><SectionLabel>{t.faq.label}</SectionLabel><h2 className="font-serif mt-4 max-w-[18rem] text-[clamp(29px,3.6vw,43px)] leading-[1.08] tracking-[-0.025em]">{t.faq.heading}</h2></div>
+      <div className="faq-list">{t.faq.items.map(([question, answer], index) => {
+        const isOpen = open === index
+        return <div key={question} className={`faq-item ${isOpen ? 'is-open' : ''}`}>
+          <button onClick={() => setOpen(isOpen ? null : index)} className="faq-question" id={`faq-question-${index}`} aria-expanded={isOpen} aria-controls={`faq-answer-${index}`}>
+            <span className="faq-question-number" aria-hidden="true">0{index + 1}</span>
+            <span className="faq-question-text">{question}</span>
+            <span className="faq-chevron" aria-hidden="true"><IconChevron className={`h-4 w-4 ${isOpen ? 'rotate-180' : ''}`} /></span>
+          </button>
+          <div id={`faq-answer-${index}`} role="region" aria-labelledby={`faq-question-${index}`} aria-hidden={!isOpen} className={`faq-answer ${isOpen ? 'is-open' : ''}`}><div><p>{answer}</p></div></div>
         </div>
-        <div className="border-t border-ink-15">
-          {faqs.map(([q, a], i) => {
-            const isOpen = open === i
-            return (
-              <div
-                key={i}
-                className={`border-b border-ink-15 px-4 -mx-4 rounded-[8px] transition-colors duration-200 ${
-                  isOpen ? 'bg-cream/35' : ''
-                }`}
-              >
-                <button
-                  onClick={() => setOpen(isOpen ? null : i)}
-                  className="w-full flex items-center justify-between gap-6 py-5 text-left"
-                  aria-expanded={isOpen}
-                >
-                  <span className="text-[17px] font-medium text-ink">{q}</span>
-                  <span className={`shrink-0 text-ink-60 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
-                    <IconChevron />
-                  </span>
-                </button>
-                <div className={`grid transition-all duration-300 ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                  <div className="overflow-hidden">
-                    <p className={`pb-5 text-[16px] leading-[1.7] text-ink-60 max-w-[38rem] ${a.startsWith('[') ? 'font-mono text-ink-45' : ''}`}>{a}</p>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </section>
-  )
+      })}</div>
+    </div>
+  </section>
 }
 
-/* ---------- FOOTER ---------- */
-function Footer() {
-  const { t } = useLang()
-  const cols = t.footer.links
-  return (
-    <footer className="border-t border-ink-15">
-      <div className="mx-auto max-w-[1320px] px-6 md:px-10 py-14 flex flex-col md:flex-row md:items-end justify-between gap-8">
-        <div>
-          <Wordmark className="text-[26px]" />
-          <p className="mt-4 text-[15px] text-ink-60 max-w-[22rem]">
-            {t.footer.tagline}
-          </p>
-        </div>
-        <nav className="flex flex-wrap gap-x-8 gap-y-3">
-          {cols.map(([l, h]) => (
-            <a key={l} href={h} className="text-[15px] text-ink-60 hover:text-ink transition-colors">{l}</a>
-          ))}
-        </nav>
-      </div>
-      <div className="mx-auto max-w-[1320px] px-6 md:px-10 pb-10">
-        <p className="text-[13px] text-ink-45">{t.footer.copyright(new Date().getFullYear())}</p>
-      </div>
-    </footer>
-  )
-}
+function Footer() { const { t } = useLang(); return <footer className="home-footer border-t border-ink-15 bg-white-soft"><div className="focuso-container py-12"><div className="flex flex-col justify-between gap-8 md:flex-row md:items-end"><div><Wordmark className="text-[19px]" /><p className="mt-3 max-w-[16rem] text-[11px] leading-[1.65] text-ink-60">{t.footer.tagline}</p></div><nav className="flex flex-wrap gap-x-6 gap-y-2">{t.footer.links.map(([label, href]) => <a key={label} href={href} className="text-[10px] text-ink-60 transition hover:text-ink">{label}</a>)}</nav></div><p className="mt-8 text-[9px] text-ink-45">{t.footer.copyright(new Date().getFullYear())}</p></div></footer> }
 
-export function Home({ onOrder, qty, setQty }: { onOrder: () => void; qty: number; setQty: (n: number) => void }) {
-  return (
-    <>
-      <Hero onOrder={onOrder} />
-      <Tension />
-      <System />
-      <SixtyDay />
-      <Details />
-      <Purchase onOrder={onOrder} qty={qty} setQty={setQty} />
-      <FAQ />
-      <Footer />
-    </>
-  )
-}
+export function Home({ onOrder, qty, setQty }: { onOrder: () => void; qty: number; setQty: (n: number) => void }) { return <div className="focuso-home"><Hero onOrder={onOrder} /><Problem /><System /><HabitGrowth /><SixtyDay /><Purchase onOrder={onOrder} qty={qty} setQty={setQty} /><FAQ /><Footer /></div> }

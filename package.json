@@ -8,7 +8,11 @@
     "build": "vite build",
     "start": "tsx server.ts",
     "preview": "vite preview --host 0.0.0.0 --port 3000",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "tsx server/domain/pricing.test.ts && tsx server/test/integrationGuard.test.ts",
+    "test:unit": "tsx server/domain/pricing.test.ts && tsx server/test/integrationGuard.test.ts",
+    "test:integration": "tsx server/test/integrationPreflight.ts && tsx server/services/coupons.test.ts && tsx server/services/test_endpoint.ts && tsx server/services/orders.test.ts && tsx server/services/step6b.test.ts && tsx server/services/step7.test.ts && tsx server/services/step8a.test.ts && tsx server/services/step8b.test.ts && tsx server/services/step8c.test.ts && tsx server/services/step8d.test.ts && tsx server/services/step9a.test.ts && tsx server/services/step9a1.test.ts",
+    "validate": "tsc --noEmit && vite build && tsx server/domain/pricing.test.ts && tsx server/test/integrationGuard.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

@@ -11,8 +11,11 @@
  */
 
 import { getSupabaseAdmin } from '../lib/supabaseAdmin'
+import { requireIsolatedSupabaseIntegrationTest } from '../test/integrationGuard'
 
 const BASE_URL = 'http://127.0.0.1:3000'
+
+requireIsolatedSupabaseIntegrationTest('step8a.test.ts')
 
 async function runStep8ATests() {
   console.log('===============================================================')

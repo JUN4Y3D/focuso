@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import { getSupabaseAdmin } from '../lib/supabaseAdmin'
+import { requireIsolatedSupabaseIntegrationTest } from '../test/integrationGuard'
 
 const BASE_URL = 'http://localhost:3000'
+
+requireIsolatedSupabaseIntegrationTest('step7.test.ts')
 
 async function runStep7TestSuite() {
   console.log('===============================================================')

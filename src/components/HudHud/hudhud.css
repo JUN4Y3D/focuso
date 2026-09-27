@@ -1,0 +1,89 @@
+.hudhud-perch {
+  --hudhud-bottom-offset: 20px;
+  --hudhud-right-offset: 20px;
+  position: fixed;
+  bottom: calc(var(--hudhud-bottom-offset) + env(safe-area-inset-bottom, 0px));
+  right: calc(var(--hudhud-right-offset) + env(safe-area-inset-right, 0px));
+  z-index: 40;
+}
+.hudhud-trigger { position: relative; display: block; width: 88px; height: 112px; color: var(--color-deep); cursor: pointer; border-radius: 8px; }
+.hudhud-flight { position: absolute; top: 0; left: 0; width: 88px; height: 88px; transform-origin: 50% 85%; }
+.hudhud-bird { display: block; transition: transform 180ms cubic-bezier(.2,.7,.2,1); }
+.hudhud-art { display: block; width: 100%; height: auto; overflow: visible; }
+.hudhud-posture { transform-origin: 48px 53px; transition: transform 260ms cubic-bezier(.2,.7,.3,1); }
+.hudhud-crest { transform-origin: 61px 25px; transition: transform 260ms; }
+.hudhud-wing-near, .hudhud-wing-far { opacity: 0; transition: opacity 180ms; }
+.hudhud-wing-stroke { transform-origin: 47px 53px; }
+.hudhud-wing-far { transform: translate(5px,-3px) scale(.9); transform-origin: 47px 53px; }
+.hudhud-folded-wing, .hudhud-legs { transition: opacity 200ms; }
+[data-phase='flying'] .hudhud-posture { transform: rotate(19deg); }
+[data-phase='flying'] .hudhud-crest { transform: rotate(-14deg) scaleY(.8); }
+[data-phase='flying'] .hudhud-folded-wing, [data-phase='flying'] .hudhud-legs { opacity: 0; }
+[data-phase='flying'] .hudhud-wing-near, [data-phase='flying'] .hudhud-wing-far { opacity: 1; }
+.hudhud-trigger:focus-visible { outline: 2px solid var(--color-green); outline-offset: 4px; }
+.hudhud-branch { position: absolute; left: 0; top: 66px; width: 88px; height: 24px; }
+.hudhud-tooltip { position: absolute; right: 0; bottom: calc(100% + 8px); width: max-content; max-width: 220px; padding: 7px 11px; background: var(--color-white-soft); color: var(--color-ink); border: 1px solid rgba(40,94,73,.18); border-radius: 5px; font-size: 12px; opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity 160ms, transform 160ms; }
+.hudhud-trigger:focus-visible .hudhud-tooltip { opacity: 1; transform: none; }
+@media (hover: hover) {
+  .hudhud-trigger:hover .hudhud-bird { transform: rotate(-4deg) translateY(-2px); }
+  .hudhud-trigger:hover .hudhud-tooltip { opacity: 1; transform: none; }
+}
+.hudhud-trigger:active .hudhud-bird { transform: translateY(-3px) rotate(3deg); }
+[data-phase='waiting'] .hudhud-flight { opacity: 0; }
+[data-phase='flying'] .hudhud-flight { pointer-events: none; will-change: transform; }
+[data-phase='flying'] .hudhud-wing-stroke { animation: hudhud-wingbeats 3200ms linear both; }
+[data-phase='flying'] .hudhud-wing-far .hudhud-wing-stroke { animation-name: hudhud-far-wingbeats; }
+@keyframes hudhud-wingbeats {
+  0%, 10%, 20%, 30%, 42%, 56%, 74% { transform: rotate(-45deg) scaleY(.45); animation-timing-function: cubic-bezier(.3,0,.6,1); }
+  5%, 15%, 25%, 36% { transform: rotate(24deg) scaleY(1); animation-timing-function: cubic-bezier(.15,.4,.45,1); }
+  49% { transform: rotate(18deg) scaleY(.95); animation-timing-function: cubic-bezier(.15,.4,.45,1); }
+  65% { transform: rotate(10deg) scaleY(.8); animation-timing-function: cubic-bezier(.15,.4,.45,1); }
+  85% { transform: rotate(0) scaleY(.65); animation-timing-function: cubic-bezier(.15,.4,.45,1); }
+  100% { transform: rotate(-40deg) scale(.6,.3); }
+}
+@keyframes hudhud-far-wingbeats {
+  0%, 10%, 20%, 30%, 42%, 56%, 74% { transform: rotate(15deg) scaleY(.45); }
+  5%, 15%, 25%, 36%, 49% { transform: rotate(65deg) scaleY(.95); }
+  65%, 85% { transform: rotate(45deg) scaleY(.7); }
+  100% { transform: rotate(0) scale(.6,.3); }
+}
+[data-phase='landing'] .hudhud-flight { animation: hudhud-land 280ms cubic-bezier(.2,.7,.3,1) both; }
+[data-phase='idle'] .hudhud-flight { animation: hudhud-idle 24s ease-in-out infinite; }
+[data-phase='landing'] .hudhud-branch { animation: hudhud-branch-settle 280ms cubic-bezier(.2,.7,.3,1); }
+@keyframes hudhud-branch-settle { 0%, 100% { transform: translateY(0); } 35% { transform: translateY(.6px); } }
+@keyframes hudhud-land { from { transform: translateY(-4px); } to { transform: translateY(0); } }
+@keyframes hudhud-presence-fade { from { opacity: .5; } to { opacity: 1; } }
+@keyframes hudhud-idle { 0%, 86%, 100% { transform: rotate(0); } 91% { transform: rotate(-2deg); } 95% { transform: rotate(1deg); } }
+.hudhud-dialog { position: fixed; inset: auto 24px 24px auto; margin: 0; padding: 0; width: min(420px, calc(100vw - 32px)); height: min(660px, calc(100dvh - 48px)); max-height: none; max-width: none; border: 1px solid rgba(40,94,73,.18); border-radius: 12px; color: var(--color-ink); background: var(--color-white-soft); box-shadow: 0 16px 60px rgba(30,50,40,.16); overflow: hidden; transform-origin: bottom right; }
+.hudhud-dialog[open] { display: flex; flex-direction: column; animation: hudhud-panel 180ms cubic-bezier(.2,.7,.2,1); }
+.hudhud-dialog::backdrop { background: rgba(30,45,36,.16); }
+@keyframes hudhud-panel { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+.hudhud-dialog > header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid rgba(40,94,73,.13); background: var(--color-soft-green); }
+.hudhud-avatar { width: 44px; flex-shrink: 0; }
+.hudhud-dialog > header h2 { font-size: 22px; line-height: 1.2; }
+.hudhud-dialog > header p { margin-top: 5px; font-size: 12px; }
+.hudhud-dialog > header button { margin-left: auto; min-width: 44px; min-height: 44px; display: grid; place-items: center; }
+.hudhud-dialog input { min-width: 0; font-size: 16px; }
+.hudhud-dialog form { padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
+.hudhud-dialog button[type='submit'] { min-width: 44px; min-height: 44px; }
+.hudhud-starters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.hudhud-starters button { min-height: 40px; text-align: left; font-size: 12px; line-height: 1.5; padding: 8px 10px; border: 1px solid rgba(40,94,73,.16); border-radius: 5px; background: white; }
+.hudhud-starters button:hover { background: var(--color-soft-green); }
+@media (max-width: 600px) {
+  .hudhud-perch { --hudhud-right-offset: 10px; --hudhud-bottom-offset: 12px; }
+  .hudhud-trigger { width: 64px; height: 87px; }
+  .hudhud-flight { width: 64px; height: 64px; }
+  .hudhud-branch { width: 64px; top: 46px; }
+  .hudhud-dialog { inset: auto 8px max(8px, env(safe-area-inset-bottom, 0px)) 8px; width: auto; height: min(640px, calc(100dvh - 16px)); }
+}
+@media (max-height: 500px) { .hudhud-dialog { inset: 8px; width: auto; height: calc(100dvh - 16px); } .hudhud-dialog .hudhud-suggestions { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .hudhud-flight, .hudhud-dialog[open] { animation: none !important; transform: none !important; opacity: 1 !important; }
+  .hudhud-bird, .hudhud-tooltip { transition: none; }
+  .hudhud-bird { animation: hudhud-presence-fade 180ms linear both; }
+  .hudhud-dialog .animate-pulse { animation: none; }
+  .hudhud-posture, .hudhud-crest { transform: none !important; transition: none; }
+  .hudhud-wing-near, .hudhud-wing-far { display: none; }
+  .hudhud-folded-wing, .hudhud-legs { opacity: 1 !important; transition: none; }
+  .hudhud-branch { animation: none !important; }
+}

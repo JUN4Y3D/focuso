@@ -15,9 +15,9 @@ export interface ValidatedServerEnv {
 export function validateServerEnvironment(): ValidatedServerEnv {
   const missing: string[] = []
 
-  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').trim()
+  const supabaseUrl = (process.env.SUPABASE_URL || '').trim()
   if (!supabaseUrl) {
-    missing.push('SUPABASE_URL (or VITE_SUPABASE_URL)')
+    missing.push('SUPABASE_URL')
   }
 
   const supabaseSecretKey = (process.env.SUPABASE_SECRET_KEY || '').trim()

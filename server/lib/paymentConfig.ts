@@ -13,11 +13,11 @@ export interface PublicPaymentConfig {
 
 export function getPublicPaymentConfig(): PublicPaymentConfig {
   const configuredNumber = process.env.BKASH_SEND_MONEY_NUMBER?.trim()
-  // Provide safe fallback number if not explicitly set in environment
-  const bkashNumber = configuredNumber || '01812345678'
 
   return {
     bkashManualEnabled: true,
-    bkashNumber,
+    // Server startup rejects a missing number, so never surface a hard-coded
+    // payment destination if this helper is reused outside normal startup.
+    bkashNumber: configuredNumber || '',
   }
 }

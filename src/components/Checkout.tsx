@@ -12,7 +12,7 @@ function Field({
   value: string; onChange: (v: string) => void; required?: boolean; textarea?: boolean
 }) {
   const cls =
-    'mt-2 w-full rounded-[10px] border border-ink-15 bg-white px-4 py-3 text-[16px] text-ink placeholder:text-ink-45 focus:border-green focus:outline-none transition-colors'
+    'mt-2 w-full rounded-[6px] border border-ink-15 bg-white px-4 py-3 text-[15px] text-ink placeholder:text-ink-45 focus:border-green focus:outline-none transition-colors'
   return (
     <label htmlFor={id} className="block">
       <span className="text-[14px] font-medium text-ink">
@@ -106,7 +106,8 @@ export function Checkout({
   const [amountChangedWarning, setAmountChangedWarning] = useState(false)
 
   // Public payment configuration loaded from server
-  const [bkashNumber, setBkashNumber] = useState('01812345678')
+  const [bkashNumber, setBkashNumber] = useState<string | null>(null)
+  const [bkashConfigState, setBkashConfigState] = useState<'loading' | 'ready' | 'error'>('loading')
 
   // Coupon state
   const [couponInput, setCouponInput] = useState('')
@@ -131,13 +132,20 @@ export function Checkout({
   // Fetch safe payment config on mount
   useEffect(() => {
     fetch('/api/payment-config')
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Payment configuration request failed (${res.status})`)
+        return res.json()
+      })
       .then((cfg) => {
-        if (cfg && cfg.bkashNumber) {
-          setBkashNumber(cfg.bkashNumber)
+        if (!cfg || typeof cfg.bkashNumber !== 'string' || !/^01\d{9}$/.test(cfg.bkashNumber)) {
+          throw new Error('Payment configuration response was invalid')
         }
+        setBkashNumber(cfg.bkashNumber)
+        setBkashConfigState('ready')
       })
       .catch((err) => {
+        setBkashNumber(null)
+        setBkashConfigState('error')
         console.warn('Could not load payment configuration from server:', err)
       })
   }, [])
@@ -342,6 +350,7 @@ export function Checkout({
 
   // Copy bKash Send Money number
   const handleCopyBkashNumber = () => {
+    if (!bkashNumber) return
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard.writeText(bkashNumber)
       setCopiedNumber(true)
@@ -351,6 +360,7 @@ export function Checkout({
 
   // Handle switching payment method
   const handleSelectPaymentMethod = (method: PaymentMethod) => {
+    if (method === 'bkash_manual' && !bkashNumber) return
     setPaymentMethod(method)
     setSubmitError(null)
     if (method === 'cod') {
@@ -360,7 +370,9 @@ export function Checkout({
     }
   }
 
-  const isBkashValid = paymentMethod === 'bkash_manual' ? Boolean(bkashTrxId.trim().length >= 6) : true
+  const isBkashValid = paymentMethod === 'bkash_manual'
+    ? Boolean(bkashNumber && bkashTrxId.trim().length >= 6)
+    : true
 
   const valid = Boolean(
     f.name.trim() &&
@@ -522,11 +534,11 @@ export function Checkout({
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="storefront-checkout min-h-screen">
       <header className="border-b border-ink-15">
-        <div className="mx-auto max-w-[1080px] px-6 md:px-10 h-[72px] flex items-center justify-between">
+        <div className="focuso-container h-[64px] flex items-center justify-between">
           <button onClick={onBack} className="hover:opacity-70 transition-opacity">
-            <Wordmark className="text-[24px]" />
+            <Wordmark className="text-[20px]" />
           </button>
           <div className="flex items-center gap-6">
             <LangToggle />
@@ -540,9 +552,9 @@ export function Checkout({
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1080px] px-6 md:px-10 py-12 md:py-16">
-        <h1 className="font-serif text-[clamp(32px,5vw,44px)] leading-[1.1]">{c.title}</h1>
-        <p className="mt-3 text-[16px] text-ink-60">{c.subtitle}</p>
+      <main className="focuso-container py-12 md:py-16">
+        <h1 className="font-serif text-[clamp(32px,5vw,44px)] leading-[1.08] tracking-[-0.025em]">{c.title}</h1>
+        <p className="mt-3 text-[15px] text-ink-60">{c.subtitle}</p>
 
         <form
           onSubmit={handleSubmit}
@@ -675,10 +687,13 @@ export function Checkout({
                 {/* bKash Manual Send Money Option */}
                 <label
                   onClick={() => handleSelectPaymentMethod('bkash_manual')}
+                  aria-disabled={!bkashNumber}
                   className={`flex flex-col justify-between p-4 rounded-[12px] border cursor-pointer transition-all ${
                     paymentMethod === 'bkash_manual'
                       ? 'border-green bg-soft-green/60 shadow-xs'
-                      : 'border-ink-15 bg-white hover:border-ink-45'
+                      : bkashNumber
+                        ? 'border-ink-15 bg-white hover:border-ink-45'
+                        : 'border-ink-15 bg-ink/[0.03] opacity-65 cursor-not-allowed'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -688,6 +703,7 @@ export function Checkout({
                       value="bkash_manual"
                       checked={paymentMethod === 'bkash_manual'}
                       onChange={() => handleSelectPaymentMethod('bkash_manual')}
+                      disabled={!bkashNumber}
                       className="sr-only"
                     />
                     <span className={`grid place-items-center w-5 h-5 rounded-full border-2 ${
@@ -703,7 +719,11 @@ export function Checkout({
                     </div>
                   </div>
                   <span className="text-[13px] text-ink-60 mt-2 pl-8">
-                    {c.bkashDesc || (lang === 'bn' ? 'bKash সেন্ড মানি করে এখনই পরিশোধ করুন' : 'Pay now using bKash Send Money')}
+                    {bkashConfigState === 'loading'
+                      ? (lang === 'bn' ? 'পেমেন্ট তথ্য লোড হচ্ছে…' : 'Loading payment details…')
+                      : bkashConfigState === 'error'
+                        ? (lang === 'bn' ? 'bKash পেমেন্ট বর্তমানে অনুপলব্ধ' : 'bKash payment is currently unavailable')
+                        : c.bkashDesc || (lang === 'bn' ? 'bKash সেন্ড মানি করে এখনই পরিশোধ করুন' : 'Pay now using bKash Send Money')}
                   </span>
                 </label>
               </div>
@@ -801,7 +821,7 @@ export function Checkout({
           </div>
 
           {/* Order summary */}
-          <aside className="rounded-[16px] border border-ink-15 bg-white p-6 lg:sticky lg:top-24">
+          <aside className="rounded-[9px] border border-ink-15 bg-white p-6 lg:sticky lg:top-20">
             <h2 className="text-[13px] font-semibold tracking-[0.16em] uppercase text-green">
               {c.orderSummary}
             </h2>

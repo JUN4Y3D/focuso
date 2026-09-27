@@ -12,19 +12,23 @@
  */
 import express from 'express'
 import helmet from 'helmet'
-import {
+import { getSupabaseConfig } from '../lib/supabaseAdmin'
+import { createClient } from '@supabase/supabase-js'
+import { calculateBasePricing } from '../domain/pricing'
+import { validateAndCalculateCoupon } from './coupons'
+import { requireIsolatedSupabaseIntegrationTest } from '../test/integrationGuard'
+
+const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000'
+
+requireIsolatedSupabaseIntegrationTest('step9a1.test.ts')
+
+const {
   checkOrderRateLimit,
   resetOrderRateLimitForTesting,
   checkRateLimit,
   checkAdminMutationRateLimit,
   getClientIp,
-} from '../../server'
-import { getSupabaseConfig } from '../lib/supabaseAdmin'
-import { createClient } from '@supabase/supabase-js'
-import { calculateBasePricing } from '../domain/pricing'
-import { validateAndCalculateCoupon } from './coupons'
-
-const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000'
+} = await import('../../server')
 
 async function runStep9A1Tests() {
   console.log('===============================================================')

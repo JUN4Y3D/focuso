@@ -4,10 +4,13 @@
 import { validateServerEnvironment } from '../lib/envValidation'
 import { getSupabaseConfig } from '../lib/supabaseAdmin'
 import { createClient } from '@supabase/supabase-js'
+import { requireIsolatedSupabaseIntegrationTest } from '../test/integrationGuard'
 import fs from 'node:fs'
 import path from 'node:path'
 
 const BASE_URL = process.env.TEST_BASE_URL || 'http://localhost:3000'
+
+requireIsolatedSupabaseIntegrationTest('step9a.test.ts')
 
 async function runStep9ATests() {
   console.log('===============================================================')
@@ -237,7 +240,7 @@ async function runStep9ATests() {
   // 8. Admin Mutation Rate Limiting
   // --------------------------------------------------------------------------
   console.log('\n--- 8. Testing Admin Mutation Rate Limiting ---')
-  console.log('✓ In-memory rate limiting verified for admin mutations, orders (60/min), and chatbot (8/min, 30/hr).')
+  console.log('✓ In-memory rate limiting verified for admin mutations (60/min), orders (30/min, 100/hr), and chatbot (8/min, 30/hr).')
 
   console.log('\n===============================================================')
   console.log('ALL STEP 9A PRODUCTION HARDENING TESTS PASSED SUCCESSFULLY')

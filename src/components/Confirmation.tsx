@@ -34,11 +34,11 @@ export function Confirmation({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white-soft">
+    <div className="storefront-confirmation min-h-screen flex flex-col bg-white-soft">
       <header className="border-b border-ink-15">
-        <div className="mx-auto max-w-[1080px] px-6 md:px-10 h-[72px] flex items-center justify-between">
+        <div className="focuso-container h-[64px] flex items-center justify-between">
           <button onClick={onHome} className="hover:opacity-70 transition-opacity">
-            <Wordmark className="text-[24px]" />
+            <Wordmark className="text-[20px]" />
           </button>
           <LangToggle />
         </div>
@@ -73,7 +73,7 @@ export function Confirmation({
           )}
 
           {/* Authoritative Order Details Card */}
-          <div className="mt-8 rounded-[16px] border border-ink-15 bg-white text-left divide-y divide-ink-15 shadow-xs overflow-hidden">
+          <div className="mt-8 rounded-[9px] border border-ink-15 bg-white text-left divide-y divide-ink-15 shadow-xs overflow-hidden">
             {/* Header: Order Number & Status */}
             <div className="p-5 bg-sand-light/40 flex flex-wrap items-center justify-between gap-3">
               <div>

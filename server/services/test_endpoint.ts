@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import { requireIsolatedSupabaseIntegrationTest } from '../test/integrationGuard'
+
+requireIsolatedSupabaseIntegrationTest('test_endpoint.ts')
 
 async function testEndpointCases() {
   console.log('Testing /api/coupon-preview live HTTP endpoint:\n')

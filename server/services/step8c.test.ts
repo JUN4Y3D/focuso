@@ -17,8 +17,11 @@
 
 import { getSupabaseAdmin, getSupabaseConfig } from '../lib/supabaseAdmin'
 import crypto from 'node:crypto'
+import { requireIsolatedSupabaseIntegrationTest } from '../test/integrationGuard'
 
 const BASE_URL = 'http://127.0.0.1:3000'
+
+requireIsolatedSupabaseIntegrationTest('step8c.test.ts')
 
 async function runStep8CTests() {
   console.log('===============================================================')
@@ -41,6 +44,8 @@ async function runStep8CTests() {
   let adminId: string | null = null
   let nonAdminId: string | null = null
   let inactiveId: string | null = null
+  const createdOrderIds: string[] = []
+  const createdIdempotencyKeys: string[] = []
 
   try {
     // 1. Create users
@@ -122,6 +127,7 @@ async function runStep8CTests() {
       if (error || !data) {
         throw new Error(`Failed to create test order: ${error?.message}`)
       }
+      createdOrderIds.push(data.id)
       return data
     }
 
@@ -497,6 +503,8 @@ async function runStep8CTests() {
 
     // --- TEST 12: Customer Checkout & Pricing Regression ---
     console.log('\n--- 12. Verifying Customer Checkout & Pricing Flow ---')
+    const checkoutIdempotencyKey = crypto.randomUUID()
+    createdIdempotencyKeys.push(checkoutIdempotencyKey)
     const rCheckout = await fetch(`${BASE_URL}/api/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -509,7 +517,7 @@ async function runStep8CTests() {
         quantity: 1,
         paymentMethod: 'cod',
         couponCode: 'FOCUS25',
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: checkoutIdempotencyKey,
       }),
     })
     if (rCheckout.status !== 200 && rCheckout.status !== 201) {
@@ -549,6 +557,19 @@ async function runStep8CTests() {
     console.log('ALL STEP 8C TESTS PASSED SUCCESSFULLY!')
     console.log('===============================================================')
   } finally {
+    // Remove only rows created by this suite from the dedicated test project.
+    for (const orderId of createdOrderIds) {
+      try {
+        await adminClient.from('admin_audit_log').delete().eq('entity_id', orderId)
+        await adminClient.from('orders').delete().eq('id', orderId)
+      } catch {}
+    }
+    for (const idempotencyKey of createdIdempotencyKeys) {
+      try {
+        await adminClient.from('orders').delete().eq('idempotency_key', idempotencyKey)
+        await adminClient.from('admin_audit_log').delete().eq('entity_id', idempotencyKey)
+      } catch {}
+    }
     // Clean up test auth users
     if (adminId) await adminClient.auth.admin.deleteUser(adminId).catch(() => {})
     if (nonAdminId) await adminClient.auth.admin.deleteUser(nonAdminId).catch(() => {})

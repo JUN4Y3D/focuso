@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
+import { requireIsolatedSupabaseIntegrationTest } from '../test/integrationGuard'
 import {
   calculateDiscountAmount,
   normalizeCouponCode,
   validateAndCalculateCoupon,
 } from './coupons'
+
+requireIsolatedSupabaseIntegrationTest('coupons.test.ts')
 
 async function runCouponTests() {
   console.log('Running FOCUSO Step 5 Coupon Tests:\n')

@@ -31,7 +31,7 @@ type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 
 export function Button({ variant = 'primary', full, className = '', children, ...rest }: BtnProps) {
   const base =
-    'inline-flex items-center justify-center gap-2 rounded-[10px] text-[16px] font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.985] px-6 py-3.5'
+    'inline-flex items-center justify-center gap-2 rounded-[6px] text-[15px] font-semibold transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.985] px-6 py-3'
   const styles = {
     primary: 'bg-green text-white-soft hover:bg-deep',
     secondary: 'border border-ink-15 text-ink hover:bg-ink-04 bg-transparent',
