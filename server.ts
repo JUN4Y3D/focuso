@@ -225,9 +225,9 @@ Tone & Behavioral Rules:
 - If asked in Bengali, reply naturally and respectfully in Bengali; if in English, reply in English.
 - Do not ramble, do not write essays, and do not invent policies or timeframes not listed above.`
 
-async function startServer() {
-  const app = express()
+export const app = express()
 
+function configureApp() {
   // 1. Trust 1 reverse proxy hop (Cloud Run / AI Studio ingress) for accurate req.ip
   app.set('trust proxy', 1)
 
@@ -869,7 +869,13 @@ async function startServer() {
       code: 'internal_server_error',
     })
   })
+}
 
+configureApp()
+
+export default app
+
+async function startServer() {
   if (!isProduction) {
     const { createServer: createViteServer } = await import('vite')
     const vite = await createViteServer({
@@ -913,7 +919,13 @@ async function startServer() {
   process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err)
-  process.exit(1)
-})
+const isDirectExecution = process.argv[1]
+  ? path.resolve(process.argv[1]) === __filename
+  : false
+
+if (isDirectExecution) {
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err)
+    process.exit(1)
+  })
+}
