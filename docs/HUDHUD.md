@@ -49,6 +49,32 @@ for `npm run validate`. Mocks verify application behavior, not the live model's
 semantic compliance. See the [minimum-sufficient answers report](/Users/md.junayed/Desktop/focuso/HUDHUD_MINIMUM_SUFFICIENT_ANSWERS_REPORT.md)
 and the [earlier response-quality report](/Users/md.junayed/Desktop/focuso/HUDHUD_RESPONSE_QUALITY_IMPLEMENTATION_REPORT.md).
 
+## Current freshness, memory and safety discipline
+
+Current external facts (officeholders, news, weather, exchange rates, latest releases)
+need a brief verification limitation: HudHud has no live search. Timeless questions,
+ordinary planning and authoritative FOCUSO facts still get normal answers. Recency
+words are semantic signals, not a keyword blocker. Corrections trigger reassessment,
+not repetition of stale claims or automatic acceptance of an unverified replacement.
+
+Names and other personal facts come only from available recent user context. If a
+fact has fallen outside that window, HudHud must not invent it or claim it was never
+shared. Privacy explanations are given only when asked, acknowledging same-tab
+browser storage, blocked-storage fallback, no long-term account memory, and server/
+Cloudflare processing without unsupported retention or privacy guarantees.
+
+Corrections keep the established language unless the user changes or explicitly
+requests another; mixed messages use their dominant language. Duplicate translations
+require an explicit request. Sensitive productivity requests must not optimize
+prolonged pornography consumption, recommend adult sites or facilitate public
+exposure. Brief, nonjudgmental redirection replaces facilitation; ordinary leisure
+and non-graphic health education are not treated as those requests.
+
+`node --import tsx server/services/hudhudResponseDiscipline.test.ts` tests this prompt
+contract, mocked one-call transport and real storage/context helpers. It also runs
+automatically in the main HudHud suite/validation. Live semantic compliance is not
+proven by fixtures. See the [freshness and response discipline report](/Users/md.junayed/Desktop/focuso/HUDHUD_FRESHNESS_RESPONSE_DISCIPLINE_REPORT.md).
+
 ## Current creative flight and click sound
 
 This section supersedes the historical session/delay/silence descriptions below.
