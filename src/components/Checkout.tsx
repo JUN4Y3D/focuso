@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
-import { Button, IconArrow, IconMinus, IconPlus, Wordmark, LangToggle } from './primitives'
+import { Button, IconArrow, IconCheck, IconMinus, IconPlus, Wordmark, LangToggle } from './primitives'
 import { DailyPage } from './PlannerPages'
 import { useLang } from '../i18n'
 import { BANGLADESH_DISTRICTS } from '../lib/districts'
 import { OrderConfirmationData } from '../types/order'
 
 function Field({
-  label, id, type = 'text', placeholder, value, onChange, required, textarea,
+  label, id, type = 'text', placeholder, value, onChange, onBlur, required, textarea, error,
 }: {
   label: string; id: string; type?: string; placeholder?: string
-  value: string; onChange: (v: string) => void; required?: boolean; textarea?: boolean
+  value: string; onChange: (v: string) => void; onBlur?: () => void; required?: boolean; textarea?: boolean; error?: string
 }) {
   const cls =
-    'mt-2 w-full rounded-[6px] border border-ink-15 bg-white px-4 py-3 text-[15px] text-ink placeholder:text-ink-45 focus:border-green focus:outline-none transition-colors'
+    `mt-2 w-full rounded-[8px] border bg-white px-4 py-3 text-[15px] text-ink placeholder:text-ink-45 transition-colors focus:border-green focus:outline-none ${
+      error ? 'border-red-400 focus:border-red-500' : 'border-ink-15 hover:border-ink-45'
+    }`
   return (
     <label htmlFor={id} className="block">
       <span className="text-[14px] font-medium text-ink">
@@ -25,6 +27,9 @@ function Field({
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-error` : undefined}
           className={cls + ' resize-none'}
         />
       ) : (
@@ -34,16 +39,21 @@ function Field({
           placeholder={placeholder}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           required={required}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? `${id}-error` : undefined}
           className={cls}
         />
       )}
+      {error && <span id={`${id}-error`} role="alert" className="mt-1.5 block text-[12px] font-medium text-red-600">{error}</span>}
     </label>
   )
 }
 
 export type DeliveryZone = 'inside_chattogram' | 'outside_chattogram'
 export type PaymentMethod = 'cod' | 'bkash_manual'
+type CheckoutField = 'name' | 'phone' | 'district' | 'city' | 'address' | 'bkashTrxId'
 
 interface PricingPreviewData {
   quantity: number
@@ -98,6 +108,9 @@ export function Checkout({
   // f.city maps to Thana / Area; f.address maps to Detailed Address
   const [f, setF] = useState({ name: '', phone: '', district: '', city: '', address: '', notes: '' })
   const set = (k: keyof typeof f) => (v: string) => setF((p) => ({ ...p, [k]: v }))
+  const [touched, setTouched] = useState<Partial<Record<CheckoutField, boolean>>>({})
+  const [submitAttempted, setSubmitAttempted] = useState(false)
+  const markTouched = (field: CheckoutField) => () => setTouched((current) => ({ ...current, [field]: true }))
 
   // Payment method selection: 'cod' (default) or 'bkash_manual'
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cod')
@@ -371,15 +384,26 @@ export function Checkout({
   }
 
   const isBkashValid = paymentMethod === 'bkash_manual'
-    ? Boolean(bkashNumber && bkashTrxId.trim().length >= 6)
+    ? Boolean(bkashNumber && /^[A-Z0-9]{6,32}$/.test(bkashTrxId.trim().toUpperCase()))
     : true
 
+  const fieldErrors: Partial<Record<CheckoutField, string>> = {
+    name: f.name.trim().length >= 2 ? undefined : c.validation.name,
+    phone: /^((\+?88)?01[3-9]\d{8})$/.test(f.phone.replace(/[\s\-()]/g, '')) ? undefined : c.validation.phone,
+    district: f.district.trim() ? undefined : c.validation.district,
+    city: f.city.trim().length >= 2 ? undefined : c.validation.city,
+    address: f.address.trim().length >= 5 ? undefined : c.validation.address,
+    bkashTrxId: paymentMethod !== 'bkash_manual' || /^[A-Z0-9]{6,32}$/.test(bkashTrxId.trim().toUpperCase())
+      ? undefined
+      : c.validation.bkashTrxId,
+  }
+
+  const showFieldError = (field: CheckoutField) =>
+    fieldErrors[field] && (touched[field] || submitAttempted) ? fieldErrors[field] : undefined
+  const hasFieldErrors = Object.values(fieldErrors).some(Boolean)
+
   const valid = Boolean(
-    f.name.trim() &&
-    f.phone.trim() &&
-    f.district.trim() &&
-    f.address.trim() &&
-    f.city.trim() &&
+    !hasFieldErrors &&
     isBkashValid &&
     pricing !== null &&
     !pricingLoading &&
@@ -404,7 +428,15 @@ export function Checkout({
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!valid || submitting || !pricing || !deliveryZone || finalTotal === null) return
+    setSubmitAttempted(true)
+    if (!valid || submitting || !pricing || !deliveryZone || finalTotal === null) {
+      const firstInvalid = (Object.keys(fieldErrors) as CheckoutField[]).find((field) => fieldErrors[field])
+      if (firstInvalid) {
+        setTouched((current) => ({ ...current, [firstInvalid]: true }))
+        requestAnimationFrame(() => document.getElementById(firstInvalid)?.focus())
+      }
+      return
+    }
 
     setSubmitting(true)
     setSubmitError(null)
@@ -552,28 +584,32 @@ export function Checkout({
         </div>
       </header>
 
-      <main className="focuso-container py-12 md:py-16">
+      <main className="focuso-container checkout-shell py-10 md:py-14">
         <h1 className="font-serif text-[clamp(32px,5vw,44px)] leading-[1.08] tracking-[-0.025em]">{c.title}</h1>
         <p className="mt-3 text-[15px] text-ink-60">{c.subtitle}</p>
 
         <form
           onSubmit={handleSubmit}
-          className="mt-10 grid lg:grid-cols-[1.3fr_1fr] gap-10 lg:gap-16 items-start"
+          noValidate
+          className="mt-9 grid min-[960px]:grid-cols-[minmax(0,1.25fr)_minmax(340px,.85fr)] gap-9 min-[960px]:gap-14 items-start"
         >
           {/* Customer & Delivery Information */}
-          <div className="space-y-8">
-            <section>
-              <h2 className="text-[13px] font-semibold tracking-[0.16em] uppercase text-green">
+          <div className="checkout-details space-y-9">
+            <section className="pb-9 border-b border-ink-15">
+              <p className="text-[11px] font-semibold tracking-[0.16em] uppercase text-green">01</p>
+              <h2 className="mt-1 text-[19px] font-semibold text-ink">
                 {c.deliveryDetails}
               </h2>
-              <div className="mt-5 grid gap-5">
+              <div className="mt-6 grid gap-5">
                 <Field
                   label={c.fields.name.label}
                   id="name"
                   placeholder={c.fields.name.ph}
                   value={f.name}
                   onChange={set('name')}
+                  onBlur={markTouched('name')}
                   required
+                  error={showFieldError('name')}
                 />
 
                 <div className="grid sm:grid-cols-2 gap-5">
@@ -584,7 +620,9 @@ export function Checkout({
                     placeholder={c.fields.phone.ph}
                     value={f.phone}
                     onChange={set('phone')}
+                    onBlur={markTouched('phone')}
                     required
+                    error={showFieldError('phone')}
                   />
 
                   {/* District Selection (Step 4B: Chattogram = ৳60, All other districts = ৳100) */}
@@ -597,8 +635,13 @@ export function Checkout({
                         id="district"
                         value={f.district}
                         onChange={(e) => set('district')(e.target.value)}
+                        onBlur={markTouched('district')}
                         required
-                        className="w-full appearance-none rounded-[10px] border border-ink-15 bg-white px-4 py-3 pr-10 text-[16px] text-ink focus:border-green focus:outline-none transition-colors"
+                        aria-invalid={Boolean(showFieldError('district'))}
+                        aria-describedby={showFieldError('district') ? 'district-error' : undefined}
+                        className={`w-full appearance-none rounded-[8px] border bg-white px-4 py-3 pr-10 text-[15px] text-ink transition-colors focus:outline-none ${
+                          showFieldError('district') ? 'border-red-400 focus:border-red-500' : 'border-ink-15 hover:border-ink-45 focus:border-green'
+                        }`}
                       >
                         <option value="" disabled>
                           {c.fields.district?.ph || (lang === 'bn' ? 'জেলা নির্বাচন করুন' : 'Select your district')}
@@ -615,6 +658,7 @@ export function Checkout({
                         </svg>
                       </div>
                     </div>
+                    {showFieldError('district') && <span id="district-error" role="alert" className="mt-1.5 block text-[12px] font-medium text-red-600">{showFieldError('district')}</span>}
                   </label>
                 </div>
 
@@ -625,7 +669,9 @@ export function Checkout({
                     placeholder={c.fields.city.ph}
                     value={f.city}
                     onChange={set('city')}
+                    onBlur={markTouched('city')}
                     required
+                    error={showFieldError('city')}
                   />
                   <Field
                     label={c.fields.address.label}
@@ -633,7 +679,9 @@ export function Checkout({
                     placeholder={c.fields.address.ph}
                     value={f.address}
                     onChange={set('address')}
+                    onBlur={markTouched('address')}
                     required
+                    error={showFieldError('address')}
                   />
                 </div>
 
@@ -650,10 +698,11 @@ export function Checkout({
 
             {/* Step 7: Payment Method Selection */}
             <section>
-              <h2 className="text-[13px] font-semibold tracking-[0.16em] uppercase text-green">
+              <p className="text-[11px] font-semibold tracking-[0.16em] uppercase text-green">02</p>
+              <h2 className="mt-1 text-[19px] font-semibold text-ink">
                 {c.paymentMethod}
               </h2>
-              <div className="mt-5 grid sm:grid-cols-2 gap-4">
+              <div className="mt-5 grid sm:grid-cols-2 gap-3">
                 {/* Cash on Delivery Option */}
                 <label
                   onClick={() => handleSelectPaymentMethod('cod')}
@@ -730,7 +779,7 @@ export function Checkout({
 
               {/* bKash Payment Instructions & TrxID Input Card */}
               {paymentMethod === 'bkash_manual' && (
-                <div className="mt-5 rounded-[14px] border border-green/30 bg-white p-5 space-y-5 animate-fade shadow-xs">
+                <div className="mt-5 rounded-[14px] border border-green/25 bg-white p-5 space-y-5 animate-fade shadow-sm">
                   {/* Warning if amount changed after TrxID was typed */}
                   {amountChangedWarning && (
                     <div className="rounded-[8px] bg-amber-50 border border-amber-200 p-3 text-[13px] text-amber-900">
@@ -740,7 +789,7 @@ export function Checkout({
 
                   {/* Send Money Number & Authoritative Payable Amount Display */}
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="rounded-[10px] bg-sand-light/50 border border-ink-15 p-3.5 flex flex-col justify-between">
+                    <div className="rounded-[10px] bg-cream/45 border border-[#d9ce95] p-3.5 flex flex-col justify-between">
                       <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-ink-60">
                         {c.bkashSendMoneyTo || (lang === 'bn' ? 'সেন্ড মানি করুন' : 'Send Money to')}
                       </span>
@@ -807,13 +856,22 @@ export function Checkout({
                           setAmountChangedWarning(false)
                           setSubmitError(null)
                         }}
+                        onBlur={markTouched('bkashTrxId')}
                         required={paymentMethod === 'bkash_manual'}
-                        className="mt-2 w-full font-mono rounded-[10px] border border-ink-15 bg-white px-4 py-3 text-[16px] text-ink placeholder:font-sans placeholder:text-ink-45 focus:border-green focus:outline-none uppercase transition-colors"
+                        aria-invalid={Boolean(showFieldError('bkashTrxId'))}
+                        aria-describedby={showFieldError('bkashTrxId') ? 'bkashTrxId-error' : 'bkashTrxId-help'}
+                        className={`mt-2 w-full font-mono rounded-[8px] border bg-white px-4 py-3 text-[16px] text-ink placeholder:font-sans placeholder:text-ink-45 uppercase transition-colors focus:outline-none ${
+                          showFieldError('bkashTrxId') ? 'border-red-400 focus:border-red-500' : 'border-ink-15 focus:border-green'
+                        }`}
                       />
                     </label>
-                    <p className="mt-1.5 text-[12px] text-ink-45">
-                      {c.bkashTrxIdHelp || (lang === 'bn' ? 'টাকা পাঠানোর পর প্রাপ্ত ট্রানজেকশন আইডিটি এখানে লিখুন।' : 'Enter the alphanumeric Transaction ID received after sending money.')}
-                    </p>
+                    {showFieldError('bkashTrxId') ? (
+                      <p id="bkashTrxId-error" role="alert" className="mt-1.5 text-[12px] font-medium text-red-600">{showFieldError('bkashTrxId')}</p>
+                    ) : (
+                      <p id="bkashTrxId-help" className="mt-1.5 text-[12px] text-ink-45">
+                        {c.bkashTrxIdHelp || (lang === 'bn' ? 'টাকা পাঠানোর পর প্রাপ্ত ট্রানজেকশন আইডিটি এখানে লিখুন।' : 'Enter the alphanumeric Transaction ID received after sending money.')}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -821,8 +879,8 @@ export function Checkout({
           </div>
 
           {/* Order summary */}
-          <aside className="rounded-[9px] border border-ink-15 bg-white p-6 lg:sticky lg:top-20">
-            <h2 className="text-[13px] font-semibold tracking-[0.16em] uppercase text-green">
+          <aside className="checkout-summary rounded-[14px] border border-ink-15 bg-white p-5 sm:p-6 min-[960px]:sticky min-[960px]:top-6">
+            <h2 className="text-[11px] font-semibold tracking-[0.16em] uppercase text-green">
               {c.orderSummary}
             </h2>
             <div className="mt-5 flex gap-4">
@@ -832,23 +890,23 @@ export function Checkout({
               <div className="min-w-0">
                 <p className="text-[16px] font-semibold leading-tight">{c.productName}</p>
                 <p className="text-[14px] text-ink-60 mt-1">{c.productMeta}</p>
-                <div className="mt-3 flex items-center justify-between">
-                  <div className="inline-flex items-center border border-ink-15 rounded-[8px]">
+                <div className="mt-4 flex items-center justify-between gap-4">
+                  <div className="inline-flex min-h-10 items-center border border-ink-15 rounded-[8px] bg-white" aria-label={c.quantityLabel}>
                     <button
                       type="button"
                       onClick={() => setQty(Math.max(1, qty - 1))}
                       disabled={qty <= 1 || submitting}
-                      className="px-2.5 py-1.5 text-ink hover:text-green disabled:opacity-30 transition-colors"
+                      className="grid h-10 w-10 place-items-center text-ink hover:text-green disabled:opacity-30 transition-colors"
                       aria-label="Decrease quantity"
                     >
                       <IconMinus className="w-3.5 h-3.5" />
                     </button>
-                    <span className="px-3 text-[14px] font-medium">{qty}</span>
+                    <span className="w-8 text-center text-[14px] font-semibold" aria-live="polite">{qty}</span>
                     <button
                       type="button"
                       onClick={() => setQty(Math.min(9, qty + 1))}
                       disabled={qty >= 9 || submitting}
-                      className="px-2.5 py-1.5 text-ink hover:text-green disabled:opacity-30 transition-colors"
+                      className="grid h-10 w-10 place-items-center text-ink hover:text-green disabled:opacity-30 transition-colors"
                       aria-label="Increase quantity"
                     >
                       <IconPlus className="w-3.5 h-3.5" />
@@ -868,13 +926,13 @@ export function Checkout({
               </span>
 
               {appliedCoupon ? (
-                <div className="flex items-center justify-between rounded-[10px] border border-green/30 bg-soft-green/50 px-3.5 py-2.5">
+                <div className="flex items-center justify-between rounded-[10px] border border-[#d9ce95] bg-cream/55 px-3.5 py-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-[12px] font-semibold uppercase tracking-wider text-green bg-white px-2 py-0.5 rounded border border-green/20">
+                    <span className="text-[12px] font-semibold uppercase tracking-wider text-deep bg-white/80 px-2 py-0.5 rounded border border-[#d9ce95]">
                       {appliedCoupon.code}
                     </span>
-                    <span className="text-[13px] text-ink-60">
-                      {c.fields.coupon?.discountAppliedText || '25% discount applied'}
+                    <span className="text-[13px] text-ink">
+                      {c.fields.coupon?.applied || 'FOCUS25 applied'}
                     </span>
                   </div>
                   <button
@@ -911,7 +969,7 @@ export function Checkout({
                   </div>
 
                   {/* Eligible Promo Code Card: FOCUS25 */}
-                  <div className="rounded-[10px] border border-dashed border-green/40 bg-sand-light/50 p-3">
+                  <div className="rounded-[10px] border border-green/20 bg-soft-green/45 p-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="flex items-center gap-1.5">
@@ -968,8 +1026,8 @@ export function Checkout({
                     {deliveryCharge !== null ? (
                       formatTaka(deliveryCharge)
                     ) : (
-                      <span className="text-[13px] text-ink-45 italic">
-                        {lang === 'bn' ? 'জেলা নির্বাচন করুন' : 'Select district'}
+                      <span className="text-right text-[12px] leading-snug text-ink-45">
+                        {c.calculatedAfterDistrict}
                       </span>
                     )}
                   </dd>
@@ -985,7 +1043,7 @@ export function Checkout({
                   </div>
                 )}
 
-                <div className="flex justify-between border-t border-ink-15 pt-3 items-baseline">
+                <div className="mt-1 flex justify-between gap-5 border-t border-ink-15 pt-4 items-baseline">
                   <dt className="text-[16px] font-semibold text-ink">{c.total}</dt>
                   <dd className="text-[18px] font-serif font-bold text-deep">
                     {pricingLoading ? (
@@ -995,8 +1053,8 @@ export function Checkout({
                     ) : finalTotal !== null ? (
                       formatTaka(finalTotal)
                     ) : (
-                      <span className="text-[15px] font-sans font-normal text-ink-45">
-                        {lang === 'bn' ? '—' : '—'}
+                      <span className="max-w-36 text-right text-[12px] font-sans font-normal leading-snug text-ink-45">
+                        {c.calculatedAfterDistrict}
                       </span>
                     )}
                   </dd>
@@ -1014,22 +1072,25 @@ export function Checkout({
               </div>
             )}
 
-            <Button full className="mt-6" type="submit" disabled={!valid || submitting}>
+            <Button full className="mt-6 min-h-13" type="submit" disabled={submitting || pricingLoading}>
               {submitting
                 ? (lang === 'bn' ? 'অর্ডার প্রক্রিয়াধীন...' : 'Processing order...')
                 : c.placeOrder}
             </Button>
-            {!f.district && (
-              <p className="mt-2.5 text-[12px] text-amber-700 text-center font-medium">
-                {lang === 'bn' ? '⚠️ এগিয়ে যেতে অনুগ্রহ করে আপনার জেলা নির্বাচন করুন' : '⚠️ Please select your district to complete checkout'}
+            {!valid && !submitAttempted && !pricingLoading && (
+              <p className="mt-2.5 text-center text-[12px] text-ink-45">
+                {c.completeDetails}
               </p>
             )}
-            {paymentMethod === 'bkash_manual' && !bkashTrxId.trim() && f.district && (
-              <p className="mt-2.5 text-[12px] text-pink-700 text-center font-medium">
-                {lang === 'bn' ? '⚠️ এগিয়ে যেতে অনুগ্রহ করে bKash TrxID লিখুন' : '⚠️ Please enter bKash Transaction ID to place order'}
-              </p>
-            )}
-            <p className="mt-4 text-[13px] text-ink-45 text-center">{c.safeNote}</p>
+            <div className="mt-5 grid grid-cols-3 gap-2 border-t border-ink-15 pt-4 text-center text-[11px] leading-snug text-ink-60">
+              {c.trust.map((item: string) => (
+                <span key={item} className="flex flex-col items-center gap-1">
+                  <IconCheck className="h-3.5 w-3.5 text-green" />
+                  {item}
+                </span>
+              ))}
+            </div>
+            <p className="mt-3 text-[12px] text-ink-45 text-center">{c.safeNote}</p>
           </aside>
         </form>
       </main>

@@ -148,6 +148,15 @@ html[data-lang='bn'] .wordmark-en { letter-spacing: 0.02em !important; }
   .storefront-checkout header .focuso-container > div { gap: 12px; }
   .storefront-checkout header button { font-size: 13px; }
 }
+/* Checkout fields need an unobstructed mobile viewport. Keep HudHud available
+   immediately after the checkout instead of floating over its form controls. */
+@media (max-width: 767px) {
+  .storefront-checkout + .hudhud-perch {
+    position: static;
+    width: 64px;
+    margin: 0 18px 24px auto;
+  }
+}
 .focuso-home { --home-rule: rgba(50, 50, 50, 0.12); }
 .focuso-home .focuso-container { max-width: 1200px; }
 .focuso-home h1, .focuso-home h2 { text-wrap: balance; }
