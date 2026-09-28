@@ -16,16 +16,27 @@ retained as history, not the current persistence/provider contract.
 
 ## Current response-quality policy
 
-The server-owned prompt now identifies HudHud as FOCUSO's AI productivity assistant,
-powered by GLM-4.7-Flash through Cloudflare Workers AI. Identity answers are brief;
-FOCUSO owns the product experience, not the underlying model training.
+The server-owned prompt identifies HudHud as FOCUSO's AI productivity assistant,
+powered by GLM-4.7-Flash through Cloudflare Workers AI. Name/role answers stay brief;
+model/provider are disclosed only when explicitly requested (including contextual
+follow-ups). Greetings contain no introduction. FOCUSO owns the product experience,
+not the underlying model training.
 
-Replies answer only the current question and relevant recent context, then stop.
-Ordinary advice defaults to 1–4 short sentences or 2–4 useful bullets, roughly
-40–120 words; simple facts/identity can be shorter. Detail is reserved for requests
-that need it, still within the unchanged 350-token ceiling. No unrelated limitation
-footer, automatic planner promotion or AI-style filler is requested. Necessary
-grounding and safety remain in force, with equal standards for English/Bangla.
+Minimum-sufficient answers take priority: answer the exact intent, omit adjacent
+facts, then stop. Progressive disclosure expands only for requested detail or
+information needed to avoid misunderstanding. Overview and benefit questions get
+1–3 short sentences, not a feature/commercial catalogue. Price, delivery and coupon
+questions stay within their respective scope. Context clarifies follow-up intent;
+it does not authorize repeating earlier facts. Optional follow-up offers are rare,
+not automatic. Explicit feature lists and multi-part questions are still supported.
+
+Soft word targets: greeting 5–15; simple fact 5–30; overview 25–60; benefits 20–60;
+ordinary productivity advice 40–100. These are not minimums: no padding. Detail stays
+within the unchanged 350-token ceiling. No unrelated limitation footer, automatic
+planner promotion or AI-style filler is requested. Necessary grounding and safety
+remain in force, with equal standards for English/Bangla. Feature wording follows
+current product copy in `src/i18n.tsx`, including a daily Qur'an verse, not an inferred
+extra reading space; prices/zones come from the checkout pricing constants.
 
 The existing plain-text UI is unchanged. A small server-side presentation cleanup
 unwraps paired bold and heading markers and normalizes star bullets, preserving
@@ -35,7 +46,8 @@ renderer, answer summarizer or keyword-based disclaimer remover.
 `node --import tsx server/services/hudhudResponseQuality.test.ts` runs prompt-contract
 and mocked transport/formatting fixtures. The main HudHud suite runs it automatically
 for `npm run validate`. Mocks verify application behavior, not the live model's
-semantic compliance. See the [response-quality report](/Users/md.junayed/Desktop/focuso/HUDHUD_RESPONSE_QUALITY_IMPLEMENTATION_REPORT.md).
+semantic compliance. See the [minimum-sufficient answers report](/Users/md.junayed/Desktop/focuso/HUDHUD_MINIMUM_SUFFICIENT_ANSWERS_REPORT.md)
+and the [earlier response-quality report](/Users/md.junayed/Desktop/focuso/HUDHUD_RESPONSE_QUALITY_IMPLEMENTATION_REPORT.md).
 
 ## Current creative flight and click sound
 
