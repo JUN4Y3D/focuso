@@ -217,7 +217,7 @@ export function AdminShell({ onLogoutSuccess }: AdminShellProps) {
 
         {/* Filters and Search Bar Card */}
         <div className="bg-white rounded-xl border border-stone-200/80 p-4 shadow-xs space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
             {/* Search Input */}
             <div className="lg:col-span-2">
               <label htmlFor="order-search" className="block text-[11px] font-semibold uppercase tracking-wider text-stone-500 mb-1">
@@ -277,6 +277,28 @@ export function AdminShell({ onLogoutSuccess }: AdminShellProps) {
                 <option value="paid">Paid</option>
                 <option value="failed">Failed</option>
                 <option value="refunded">Refunded</option>
+              </select>
+            </div>
+
+            {/* Fulfillment Status Filter */}
+            <div>
+              <label htmlFor="filter-order-status" className="block text-[11px] font-semibold uppercase tracking-wider text-stone-500 mb-1">
+                Fulfillment
+              </label>
+              <select
+                id="filter-order-status"
+                value={orderStatus}
+                onChange={handleFilterChange(setOrderStatus)}
+                className="w-full px-3 py-2 text-xs rounded-lg border border-stone-300 bg-white text-ink focus:outline-none focus:ring-1 focus:ring-deep focus:border-deep transition"
+              >
+                <option value="">All Fulfillment</option>
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="processing">Processing</option>
+                <option value="shipped">Shipped</option>
+                <option value="delivered">Delivered</option>
+                <option value="returned">Returned</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </div>
 

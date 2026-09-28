@@ -241,7 +241,7 @@ export async function listAdminOrders(query: AdminOrderListQuery): Promise<Admin
 
   if (query.orderStatus) {
     const status = query.orderStatus.trim()
-    const allowed = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']
+    const allowed = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'returned', 'cancelled']
     if (allowed.includes(status)) {
       sbQuery = sbQuery.eq('order_status', status)
     }

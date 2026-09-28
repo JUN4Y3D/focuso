@@ -15,6 +15,7 @@ import {
 } from './services/adminOrderService.js'
 import {
   updateOrderStatus,
+  returnOrder,
   verifyBkashPayment,
   failBkashPayment,
   markCodPaid,
@@ -23,7 +24,6 @@ import {
   MutationValidationError,
   MutationNotFoundError,
   ALLOWED_ORDER_STATUSES,
-  OrderStatusType,
 } from './services/adminMutationService.js'
 import { z, ZodError } from 'zod'
 
@@ -602,7 +602,67 @@ function configureApp() {
     }
   })
 
-  // 4. POST /api/admin/orders/:id/verify-bkash - Manually verify bKash payment
+  // 4. POST /api/admin/orders/:id/return - Record a returned fulfillment outcome.
+  // Payment is intentionally not accepted or modified by this endpoint.
+  const ReturnOrderBodySchema = z
+    .object({
+      reason: z
+        .string()
+        .trim()
+        .min(3, 'Return reason must be at least 3 characters long.')
+        .max(300, 'Return reason cannot exceed 300 characters.'),
+      adminNote: z
+        .string()
+        .trim()
+        .max(500, 'Admin note cannot exceed 500 characters.')
+        .optional(),
+    })
+    .strict()
+
+  app.post('/api/admin/orders/:id/return', requireAdmin, async (req, res) => {
+    try {
+      const rateCheck = checkAdminMutationRateLimit(getClientIp(req))
+      if (!rateCheck.allowed) {
+        return res.status(429).json({ error: rateCheck.message, code: 'rate_limited' })
+      }
+
+      const orderId = String(req.params.id)
+      if (!orderId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
+        return res.status(400).json({ error: 'Valid order UUID is required.' })
+      }
+
+      const parseResult = ReturnOrderBodySchema.safeParse(req.body)
+      if (!parseResult.success) {
+        const issues = (parseResult.error as any).issues || (parseResult.error as any).errors || []
+        return res.status(400).json({
+          error: 'Invalid request body.',
+          details: issues.map((e: any) => e.message),
+        })
+      }
+
+      const result = await returnOrder(
+        orderId,
+        parseResult.data.reason,
+        parseResult.data.adminNote,
+        req.adminUser!
+      )
+      return res.json(result)
+    } catch (err: any) {
+      if (err instanceof MutationNotFoundError) {
+        return res.status(404).json({ error: err.message })
+      }
+      if (err instanceof MutationConflictError) {
+        return res.status(409).json({ error: err.message, code: err.code })
+      }
+      if (err instanceof MutationValidationError) {
+        return res.status(400).json({ error: err.message, code: err.code })
+      }
+      console.error('[AdminAPI] Failed to record returned order:', err?.message || err)
+      return res.status(500).json({ error: 'Failed to record returned order.' })
+    }
+  })
+
+  // 5. POST /api/admin/orders/:id/verify-bkash - Manually verify bKash payment
   app.post('/api/admin/orders/:id/verify-bkash', requireAdmin, async (req, res) => {
     try {
       const rateCheck = checkAdminMutationRateLimit(getClientIp(req))

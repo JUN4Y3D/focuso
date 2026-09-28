@@ -44,6 +44,22 @@ export interface AdminAuditEntry {
   metadata: Record<string, any>
 }
 
+/** Every fulfillment state that can exist on an order. */
+export const FULFILLMENT_ORDER_STATUSES = [
+  'pending',
+  'confirmed',
+  'processing',
+  'shipped',
+  'delivered',
+  'returned',
+  'cancelled',
+] as const
+
+/**
+ * The ordinary fulfillment transition RPC deliberately excludes `returned`.
+ * A return must go through `returnOrder`, which requires a reason and creates
+ * a dedicated audit record without changing payment state.
+ */
 export const ALLOWED_ORDER_STATUSES = [
   'pending',
   'confirmed',
@@ -74,6 +90,11 @@ function handleRpcError(error: any): never {
   if (rawMessage.startsWith('INVALID_REASON')) {
     const cleanMsg = rawMessage.replace(/^INVALID_REASON:\s*/, '')
     throw new MutationValidationError('invalid_reason', cleanMsg || 'Invalid failure reason.')
+  }
+
+  if (rawMessage.startsWith('INVALID_NOTE')) {
+    const cleanMsg = rawMessage.replace(/^INVALID_NOTE:\s*/, '')
+    throw new MutationValidationError('invalid_note', cleanMsg || 'Invalid admin note.')
   }
 
   if (rawMessage.startsWith('INVALID_TRANSITION')) {
@@ -145,6 +166,65 @@ export async function updateOrderStatus(
     orderId: data.orderId || orderId,
     orderStatus: data.to || targetStatus,
     fromStatus: data.from || targetStatus,
+  }
+}
+
+/**
+ * Records a returned fulfillment outcome without altering payment state.
+ * This is intentionally separate from generic status changes: only shipped
+ * and delivered orders may be returned, and every return has a reason.
+ */
+export async function returnOrder(
+  orderId: string,
+  rawReason: string,
+  rawAdminNote: string | undefined,
+  adminUser: { id: string; email: string }
+): Promise<{
+  orderId: string
+  orderStatus: 'returned'
+  fromStatus: string
+  reason: string
+  adminNote: string | null
+  alreadyReturned?: boolean
+}> {
+  const admin = getSupabaseAdmin()
+  if (!admin) {
+    throw new Error('Supabase admin client not initialized.')
+  }
+
+  const reason = (rawReason || '').trim()
+  const adminNote = rawAdminNote?.trim() || null
+
+  if (reason.length < 3 || reason.length > 300) {
+    throw new MutationValidationError(
+      'invalid_reason',
+      'Return reason is required and must be between 3 and 300 characters.'
+    )
+  }
+
+  if (adminNote && adminNote.length > 500) {
+    throw new MutationValidationError('invalid_note', 'Admin note cannot exceed 500 characters.')
+  }
+
+  const { data, error } = await admin.rpc('admin_return_order', {
+    p_order_id: orderId,
+    p_reason: reason,
+    p_admin_note: adminNote,
+    p_admin_id: adminUser.id,
+    p_admin_email: adminUser.email,
+  })
+
+  if (error) {
+    handleRpcError(error)
+  }
+
+  return {
+    orderId: data.orderId || orderId,
+    orderStatus: 'returned',
+    fromStatus: data.from || 'returned',
+    reason: data.reason || reason,
+    adminNote: data.adminNote ?? adminNote,
+    alreadyReturned: Boolean(data.alreadyReturned),
   }
 }
 
@@ -349,6 +429,7 @@ export async function getOrderAuditHistory(orderId: string): Promise<AdminAuditE
     if (meta.from !== undefined) sanitizedMeta.from = meta.from
     if (meta.to !== undefined) sanitizedMeta.to = meta.to
     if (meta.reason !== undefined) sanitizedMeta.reason = meta.reason
+    if (meta.adminNote !== undefined) sanitizedMeta.adminNote = meta.adminNote
     if (meta.expectedAmount !== undefined) sanitizedMeta.expectedAmount = meta.expectedAmount
     if (meta.transactionId !== undefined) sanitizedMeta.transactionId = meta.transactionId
     if (meta.amount !== undefined) sanitizedMeta.amount = meta.amount

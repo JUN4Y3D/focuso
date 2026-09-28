@@ -84,6 +84,12 @@ export function OrderStatusBadge({ status }: { status: string }) {
           Delivered
         </span>
       )
+    case 'returned':
+      return (
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-800 border border-orange-200">
+          Returned
+        </span>
+      )
     case 'cancelled':
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-stone-100 text-stone-600 border border-stone-200">

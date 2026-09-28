@@ -37,6 +37,7 @@ export interface OrderAuditRecord {
     from?: string
     to?: string
     reason?: string
+    adminNote?: string
     expectedAmount?: number
     transactionId?: string
     [key: string]: any
@@ -56,6 +57,7 @@ type DialogActionType =
   | { type: 'mark_shipped' }
   | { type: 'mark_delivered' }
   | { type: 'cancel_order' }
+  | { type: 'return_order' }
   | { type: 'verify_bkash' }
   | { type: 'fail_bkash' }
   | { type: 'mark_cod_paid' }
@@ -77,6 +79,8 @@ export function OrderDetailDrawer({
   // Dialog State
   const [activeDialog, setActiveDialog] = useState<DialogActionType | null>(null)
   const [failReason, setFailReason] = useState('')
+  const [returnReason, setReturnReason] = useState('')
+  const [returnAdminNote, setReturnAdminNote] = useState('')
 
   async function getValidToken(): Promise<string | null> {
     const client = getSupabaseBrowserClient()
@@ -224,6 +228,69 @@ export function OrderDetailDrawer({
       await fetchAudit()
     } catch (err: any) {
       setActionError(err.message || 'Error updating order status.')
+    } finally {
+      setActionPending(false)
+    }
+  }
+
+  // A return is a dedicated fulfillment action. It never changes payment state.
+  async function handleReturnOrder() {
+    if (!order || actionPending) return
+
+    const reason = returnReason.trim()
+    const adminNote = returnAdminNote.trim()
+    if (reason.length < 3) {
+      setActionError('Return reason must be at least 3 characters long.')
+      return
+    }
+    if (adminNote.length > 500) {
+      setActionError('Admin note cannot exceed 500 characters.')
+      return
+    }
+
+    setActionPending(true)
+    setActionError(null)
+
+    try {
+      const token = await getValidToken()
+      if (!token) {
+        onUnauthorized()
+        return
+      }
+
+      const res = await fetch(`/api/admin/orders/${encodeURIComponent(order.id)}/return`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason, ...(adminNote ? { adminNote } : {}) }),
+      })
+
+      if (res.status === 401 || res.status === 403) {
+        onUnauthorized()
+        return
+      }
+
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to record returned order.')
+      }
+
+      const newStatus = data.orderStatus || 'returned'
+      setOrder((prev) => (prev ? { ...prev, orderStatus: newStatus } : null))
+      onOrderUpdated?.({
+        id: order.id,
+        orderStatus: newStatus,
+        // Deliberately preserve payment status: return and refund are distinct.
+        paymentStatus: order.paymentStatus,
+      })
+      setActiveDialog(null)
+      setReturnReason('')
+      setReturnAdminNote('')
+      await fetchAudit()
+    } catch (err: any) {
+      setActionError(err.message || 'Error recording returned order.')
     } finally {
       setActionPending(false)
     }
@@ -537,18 +604,52 @@ export function OrderDetailDrawer({
                   )}
 
                   {order.orderStatus === 'shipped' && (
-                    <button
-                      onClick={() => setActiveDialog({ type: 'mark_delivered' })}
-                      disabled={actionPending}
-                      className="px-3 py-1.5 bg-emerald-700 text-white text-xs font-medium rounded-lg hover:bg-emerald-800 transition shadow-xs disabled:opacity-50"
-                    >
-                      Mark as delivered
-                    </button>
+                    <>
+                      <button
+                        onClick={() => setActiveDialog({ type: 'mark_delivered' })}
+                        disabled={actionPending}
+                        className="px-3 py-1.5 bg-emerald-700 text-white text-xs font-medium rounded-lg hover:bg-emerald-800 transition shadow-xs disabled:opacity-50"
+                      >
+                        Mark as delivered
+                      </button>
+                      <button
+                        onClick={() => {
+                          setReturnReason('')
+                          setReturnAdminNote('')
+                          setActionError(null)
+                          setActiveDialog({ type: 'return_order' })
+                        }}
+                        disabled={actionPending}
+                        className="px-3 py-1.5 bg-white border border-orange-300 text-orange-800 text-xs font-medium rounded-lg hover:bg-orange-50 transition disabled:opacity-50"
+                      >
+                        Record return
+                      </button>
+                    </>
                   )}
 
                   {order.orderStatus === 'delivered' && (
-                    <span className="text-xs text-stone-500 font-medium">
-                      Order successfully delivered. No further status changes allowed.
+                    <>
+                      <span className="text-xs text-stone-500 font-medium">
+                        Order delivered. Record a return only when the item comes back.
+                      </span>
+                      <button
+                        onClick={() => {
+                          setReturnReason('')
+                          setReturnAdminNote('')
+                          setActionError(null)
+                          setActiveDialog({ type: 'return_order' })
+                        }}
+                        disabled={actionPending}
+                        className="px-3 py-1.5 bg-white border border-orange-300 text-orange-800 text-xs font-medium rounded-lg hover:bg-orange-50 transition disabled:opacity-50"
+                      >
+                        Record return
+                      </button>
+                    </>
+                  )}
+
+                  {order.orderStatus === 'returned' && (
+                    <span className="text-xs text-orange-800 font-medium">
+                      Return recorded. Fulfillment is closed; payment remains managed separately.
                     </span>
                   )}
 
@@ -602,6 +703,12 @@ export function OrderDetailDrawer({
                     <PaymentStatusBadge status={order.paymentStatus} />
                   </div>
                 </div>
+
+                {order.orderStatus === 'returned' && (
+                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-900 leading-relaxed">
+                    <strong>Fulfillment returned.</strong> Payment status is unchanged by a return. Handle any refund through the appropriate payment process and record it separately.
+                  </div>
+                )}
 
                 {order.paymentMethod === 'bkash_manual' ? (
                   <div className="space-y-3 pt-1">
@@ -821,6 +928,9 @@ export function OrderDetailDrawer({
                       if (log.action === 'order_status_changed') {
                         actionTitle = 'Order status changed'
                         detailText = `${log.metadata.from || ''} → ${log.metadata.to || ''}`
+                      } else if (log.action === 'order_returned') {
+                        actionTitle = 'Return recorded'
+                        detailText = `${log.metadata.from || ''} → returned${log.metadata.reason ? ` · Reason: ${log.metadata.reason}` : ''}`
                       } else if (log.action === 'bkash_payment_verified') {
                         actionTitle = 'bKash payment verified'
                         detailText = `${log.metadata.from || 'pending'} → paid (৳${log.metadata.expectedAmount || order.finalTotal})`
@@ -847,6 +957,11 @@ export function OrderDetailDrawer({
                           </div>
                           {detailText && (
                             <p className="text-stone-600 mt-0.5 capitalize">{detailText}</p>
+                          )}
+                          {log.action === 'order_returned' && log.metadata.adminNote && (
+                            <p className="text-stone-600 mt-1 rounded-md bg-orange-50 border border-orange-100 px-2 py-1.5 whitespace-pre-wrap">
+                              Admin note: {log.metadata.adminNote}
+                            </p>
                           )}
                           {log.adminEmail && (
                             <p className="text-[11px] text-stone-400 mt-0.5">
@@ -927,6 +1042,69 @@ export function OrderDetailDrawer({
                       className="px-3.5 py-1.5 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg shadow-xs disabled:opacity-50"
                     >
                       {actionPending ? 'Updating...' : 'Confirm Delivered'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {activeDialog.type === 'return_order' && (
+                <>
+                  <h3 className="text-base font-bold text-orange-900">Record Return</h3>
+                  <p className="text-xs text-stone-600 leading-relaxed">
+                    Record that <strong>{order?.orderNumber}</strong> was returned. This changes only fulfillment to <strong>returned</strong>; it does not cancel the order or alter its payment status.
+                  </p>
+                  <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg text-xs text-orange-900 leading-relaxed">
+                    {order?.paymentMethod === 'bkash_manual' && order?.paymentStatus === 'paid' ? (
+                      <><strong>bKash payment remains paid.</strong> Process any refund separately through the approved payment workflow.</>
+                    ) : (
+                      <>Payment and fulfillment are tracked separately. This action does not mark a payment as refunded.</>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="return-reason" className="block text-xs font-semibold text-stone-700">
+                      Return reason <span className="text-rose-600">*</span>
+                    </label>
+                    <textarea
+                      id="return-reason"
+                      rows={3}
+                      value={returnReason}
+                      onChange={(e) => setReturnReason(e.target.value)}
+                      placeholder="e.g. Customer returned the planner after delivery."
+                      className="w-full text-xs p-2.5 border border-stone-300 rounded-lg focus:ring-1 focus:ring-orange-500 focus:outline-none"
+                      maxLength={300}
+                      required
+                    />
+                    <p className="text-[11px] text-stone-400 text-right">{returnReason.trim().length} / 300 characters</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="return-admin-note" className="block text-xs font-semibold text-stone-700">
+                      Admin note <span className="font-normal text-stone-400">(optional)</span>
+                    </label>
+                    <textarea
+                      id="return-admin-note"
+                      rows={2}
+                      value={returnAdminNote}
+                      onChange={(e) => setReturnAdminNote(e.target.value)}
+                      placeholder="Internal context for this return."
+                      className="w-full text-xs p-2.5 border border-stone-300 rounded-lg focus:ring-1 focus:ring-orange-500 focus:outline-none"
+                      maxLength={500}
+                    />
+                    <p className="text-[11px] text-stone-400 text-right">{returnAdminNote.trim().length} / 500 characters</p>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      onClick={() => setActiveDialog(null)}
+                      disabled={actionPending}
+                      className="px-3.5 py-1.5 text-xs text-stone-600 hover:text-stone-900 border border-stone-300 rounded-lg"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleReturnOrder}
+                      disabled={actionPending || returnReason.trim().length < 3}
+                      className="px-3.5 py-1.5 text-xs font-semibold text-white bg-orange-700 hover:bg-orange-800 rounded-lg shadow-xs disabled:opacity-50"
+                    >
+                      {actionPending ? 'Recording...' : 'Confirm Return'}
                     </button>
                   </div>
                 </>
