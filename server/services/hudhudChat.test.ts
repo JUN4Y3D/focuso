@@ -321,3 +321,4 @@ try {
   globalThis.fetch = originalFetch
 }
 console.log('HudHud offline tests passed: Cloudflare REST transport, 14 English + 14 Bangla + mixed-language cases, fact/task/assistant context, six-turn/character budgets, session restoration and malformed/blocked storage, UI notice exclusion, safe provider failures, actual Express route and unchanged rate limits, one-call/no-retry behavior and environment validation. Live semantic quality is not evaluated by mocks.')
+await import('./hudhudResponseQuality.test.js')

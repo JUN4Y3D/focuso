@@ -14,6 +14,29 @@ The visible Bird call credit UI has been removed; the licensed sound and its
 public attribution page remain. Historical implementation/QA notes below are
 retained as history, not the current persistence/provider contract.
 
+## Current response-quality policy
+
+The server-owned prompt now identifies HudHud as FOCUSO's AI productivity assistant,
+powered by GLM-4.7-Flash through Cloudflare Workers AI. Identity answers are brief;
+FOCUSO owns the product experience, not the underlying model training.
+
+Replies answer only the current question and relevant recent context, then stop.
+Ordinary advice defaults to 1–4 short sentences or 2–4 useful bullets, roughly
+40–120 words; simple facts/identity can be shorter. Detail is reserved for requests
+that need it, still within the unchanged 350-token ceiling. No unrelated limitation
+footer, automatic planner promotion or AI-style filler is requested. Necessary
+grounding and safety remain in force, with equal standards for English/Bangla.
+
+The existing plain-text UI is unchanged. A small server-side presentation cleanup
+unwraps paired bold and heading markers and normalizes star bullets, preserving
+paragraph spacing, mathematical syntax and fenced/inline code. It is not a Markdown
+renderer, answer summarizer or keyword-based disclaimer remover.
+
+`node --import tsx server/services/hudhudResponseQuality.test.ts` runs prompt-contract
+and mocked transport/formatting fixtures. The main HudHud suite runs it automatically
+for `npm run validate`. Mocks verify application behavior, not the live model's
+semantic compliance. See the [response-quality report](/Users/md.junayed/Desktop/focuso/HUDHUD_RESPONSE_QUALITY_IMPLEMENTATION_REPORT.md).
+
 ## Current creative flight and click sound
 
 This section supersedes the historical session/delay/silence descriptions below.
