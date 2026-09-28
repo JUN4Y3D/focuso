@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { IconClose, IconArrow } from './primitives'
 import { useLang } from '../i18n'
 import { HudHudBird, HudHudTrigger } from './HudHud/HudHudTrigger'
+import { HUDHUD_INPUT_CHARS, HUDHUD_SESSION_MESSAGES, recentHudHudContext } from '../lib/hudhudConversation'
 
 export interface Message {
   id: string
@@ -36,8 +37,8 @@ export function FocusoCompanion() {
       role: 'model',
       text:
         lang === 'bn'
-          ? 'আসসালামু আলাইকুম। আমি হুদহুদ, আপনার FOCUSO AI সহকারী। আজ কোন কাজে মনোযোগ দিতে চান?'
-          : 'Assalamu Alaikum. I’m HudHud, your FOCUSO AI assistant. What would you like help focusing on today?',
+          ? 'আসসালামু আলাইকুম 👋 আজ কোন কাজে মনোযোগ দিতে চান?'
+          : 'Assalamu Alaikum 👋 What would you like help focusing on today?',
     },
   ])
 
@@ -45,6 +46,31 @@ export function FocusoCompanion() {
   const dialogRef = useRef<HTMLDialogElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const sendingRef = useRef(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const nearBottomRef = useRef(true)
+
+  function appendMessage(message: Message) {
+    setMessages(previous => [previous[0], ...[...previous.slice(1), message].slice(-HUDHUD_SESSION_MESSAGES)])
+  }
+
+  // VisualViewport tracks the space above the mobile software keyboard.
+  useEffect(() => {
+    if (!isOpen) return
+    const viewport = window.visualViewport
+    const resize = () => {
+      const dialog = dialogRef.current
+      if (!dialog || !viewport) return
+      dialog.style.setProperty('--hudhud-viewport-height', `${viewport.height}px`)
+      dialog.style.setProperty('--hudhud-viewport-top', `${viewport.offsetTop}px`)
+    }
+    resize()
+    viewport?.addEventListener('resize', resize)
+    viewport?.addEventListener('scroll', resize)
+    return () => {
+      viewport?.removeEventListener('resize', resize)
+      viewport?.removeEventListener('scroll', resize)
+    }
+  }, [isOpen])
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -64,14 +90,14 @@ export function FocusoCompanion() {
     setMessages(previous => previous.map(message => message.id === 'welcome' ? {
       ...message,
       text: lang === 'bn'
-        ? 'আসসালামু আলাইকুম। আমি হুদহুদ, আপনার FOCUSO AI সহকারী। আজ কোন কাজে মনোযোগ দিতে চান?'
-        : 'Assalamu Alaikum. I’m HudHud, your FOCUSO AI assistant. What would you like help focusing on today?',
+        ? 'আসসালামু আলাইকুম 👋 আজ কোন কাজে মনোযোগ দিতে চান?'
+        : 'Assalamu Alaikum 👋 What would you like help focusing on today?',
     } : message))
   }, [lang])
 
   // Auto-scroll on new message
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && nearBottomRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages, loading, isOpen])
@@ -82,7 +108,7 @@ export function FocusoCompanion() {
     sendingRef.current = true
 
     // Limit client-side prompt length to avoid excessive payload
-    const safeContent = messageContent.slice(0, 400)
+    const safeContent = messageContent.slice(0, HUDHUD_INPUT_CHARS)
 
     const userMessage: Message = {
       id: 'u_' + Date.now(),
@@ -92,21 +118,23 @@ export function FocusoCompanion() {
     }
 
     const updated = [...messages, userMessage]
-    setMessages(updated)
+    nearBottomRef.current = true
+    appendMessage(userMessage)
     setInput('')
     setLoading(true)
 
     try {
-      // Send at most the last 4 messages to minimize token usage
-      const payloadMessages = updated
-        .filter((m) => !m.isNotice)
-        .slice(-4)
-        .map((m) => ({ role: m.role, text: m.text }))
+      // Keep five recent exchanges and the current message. UI greetings and
+      // failures are never sent as authoritative assistant responses.
+      const payloadMessages = recentHudHudContext(updated
+        .filter((m) => !m.isNotice && m.id !== 'welcome')
+        .map((m) => ({ role: m.role, text: m.text })))
 
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: payloadMessages }),
+        signal: AbortSignal.timeout(30000),
       })
 
       const data = await response.json().catch(() => ({}))
@@ -119,30 +147,28 @@ export function FocusoCompanion() {
             isNotice: true,
             text:
               lang === 'bn'
-                ? 'সাময়িকভাবে চ্যাটের সীমা শেষ হয়েছে। অনুগ্রহ করে কিছুক্ষণ অপেক্ষা করুন অথবা সরাসরি "প্ল্যানারটি অর্ডার করুন" বাটনে গিয়ে অর্ডার সম্পন্ন করতে পারেন।'
-                : 'Chat rate limit reached for this session. Please wait a moment or click "Order the Planner" to proceed directly with your order.',
+                ? 'হুদহুদ এখন সাময়িকভাবে ব্যস্ত। একটু পর আবার চেষ্টা করুন।'
+                : 'HudHud is temporarily unavailable. Please try again in a few moments.',
             createdAt: new Date().toISOString(),
           }
-          setMessages((prev) => [...prev, limitMsg])
+          setMessages(previous => previous.map(message => message.id === userMessage.id ? { ...message, isNotice: true } : message))
+          appendMessage(limitMsg)
           return
         }
         throw new Error(data.error || 'Failed to get response.')
       }
 
+      if (typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('Empty reply')
       const companionMessage: Message = {
         id: 'm_' + Date.now(),
         role: 'model',
-        text:
-          data.reply ||
-          (lang === 'bn'
-            ? 'ধন্যবাদ। ফোকাসো প্ল্যানার নিয়ে আর কোনো প্রশ্ন থাকলে জানান।'
-            : 'Thank you. Let me know if you have any other questions about FOCUSO.'),
+        text: data.reply,
         createdAt: new Date().toISOString(),
       }
 
-      setMessages((prev) => [...prev, companionMessage])
+      appendMessage(companionMessage)
     } catch (err: unknown) {
-      console.warn('Chat service notice:', err)
+      setMessages(previous => previous.map(message => message.id === userMessage.id ? { ...message, isNotice: true } : message))
       const errorMsg: Message = {
         id: 'err_' + Date.now(),
         role: 'model',
@@ -153,10 +179,11 @@ export function FocusoCompanion() {
             : 'HudHud couldn’t connect right now. Please try again in a moment.',
         createdAt: new Date().toISOString(),
       }
-      setMessages((prev) => [...prev, errorMsg])
+      appendMessage(errorMsg)
     } finally {
       sendingRef.current = false
       setLoading(false)
+      requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }))
     }
   }
 
@@ -203,7 +230,10 @@ export function FocusoCompanion() {
             </header>
 
             {/* Message Thread */}
-            <div ref={scrollRef} role="log" aria-label={lang === 'bn' ? 'কথোপকথন' : 'Conversation'} aria-live="polite" className="flex-1 min-h-0 overflow-y-auto px-6 py-6 space-y-4">
+            <div ref={scrollRef} onScroll={() => {
+              const thread = scrollRef.current
+              if (thread) nearBottomRef.current = thread.scrollHeight - thread.scrollTop - thread.clientHeight < 80
+            }} role="log" aria-label={lang === 'bn' ? 'কথোপকথন' : 'Conversation'} aria-live="polite" aria-relevant="additions" className="flex-1 min-h-0 overflow-y-auto px-5 py-5 space-y-4 overscroll-contain">
               {messages.map((m) => {
                 const isUser = m.role === 'user'
                 return (
@@ -212,7 +242,7 @@ export function FocusoCompanion() {
                     className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-[12px] px-4 py-3 text-[14px] leading-relaxed border ${
+                      className={`min-w-0 max-w-[92%] rounded-[14px] px-4 py-3 text-[14px] leading-relaxed border ${
                         isUser
                           ? 'bg-green text-white-soft border-green'
                           : m.isNotice
@@ -235,7 +265,7 @@ export function FocusoCompanion() {
               })}
 
               {loading && (
-                <div className="flex items-center gap-2 text-ink-60 text-[13px] italic bg-white border border-ink-15 rounded-[10px] px-3.5 py-2.5 w-fit">
+                <div role="status" className="flex items-center gap-2 text-ink-60 text-[13px] bg-white border border-ink-15 rounded-[10px] px-3.5 py-2.5 w-fit">
                   <span className="w-1.5 h-1.5 rounded-full bg-green animate-pulse" />
                   {lang === 'bn' ? 'উত্তর তৈরি হচ্ছে...' : 'HudHud is thinking…'}
                 </div>
@@ -253,6 +283,7 @@ export function FocusoCompanion() {
                     <button
                       key={idx}
                       onClick={() => handleSend(s)}
+                      disabled={loading}
                       className="text-ink-60 hover:text-green transition-colors"
                     >
                       {s}
@@ -266,15 +297,17 @@ export function FocusoCompanion() {
             <form
               onSubmit={(e) => {
                 e.preventDefault()
-                handleSend()
+                if (!sendingRef.current) handleSend()
               }}
               className="p-4 border-t border-ink-15 bg-white flex items-center gap-2"
             >
               <input
+                ref={inputRef}
                 type="text"
                 aria-label={lang === 'bn' ? 'হুদহুদকে বার্তা লিখুন' : 'Message HudHud'}
                 value={input}
-                maxLength={400}
+                maxLength={HUDHUD_INPUT_CHARS}
+                enterKeyHint="send"
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={
                   lang === 'bn'
@@ -288,7 +321,7 @@ export function FocusoCompanion() {
                 type="submit"
                 disabled={loading || !input.trim()}
                 className="inline-flex items-center justify-center p-2.5 rounded-[8px] bg-green text-white-soft hover:bg-deep disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                aria-label="Send message"
+                aria-label={lang === 'bn' ? 'বার্তা পাঠান' : 'Send message'}
               >
                 <IconArrow className="w-4 h-4" />
               </button>

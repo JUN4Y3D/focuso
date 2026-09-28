@@ -58,6 +58,7 @@ type DialogActionType =
   | { type: 'mark_delivered' }
   | { type: 'cancel_order' }
   | { type: 'return_order' }
+  | { type: 'refund_bkash' }
   | { type: 'verify_bkash' }
   | { type: 'fail_bkash' }
   | { type: 'mark_cod_paid' }
@@ -81,6 +82,9 @@ export function OrderDetailDrawer({
   const [failReason, setFailReason] = useState('')
   const [returnReason, setReturnReason] = useState('')
   const [returnAdminNote, setReturnAdminNote] = useState('')
+  const [refundReason, setRefundReason] = useState('')
+  const [refundTransactionId, setRefundTransactionId] = useState('')
+  const [refundConfirmed, setRefundConfirmed] = useState(false)
 
   async function getValidToken(): Promise<string | null> {
     const client = getSupabaseBrowserClient()
@@ -291,6 +295,32 @@ export function OrderDetailDrawer({
       await fetchAudit()
     } catch (err: any) {
       setActionError(err.message || 'Error recording returned order.')
+    } finally {
+      setActionPending(false)
+    }
+  }
+
+  async function handleRefundBkash() {
+    if (!order || actionPending || !refundConfirmed) return
+    setActionPending(true)
+    setActionError(null)
+    try {
+      const token = await getValidToken()
+      if (!token) { onUnauthorized(); return }
+      const res = await fetch(`/api/admin/orders/${encodeURIComponent(order.id)}/refund-bkash`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: refundReason.trim(), refundTransactionId: refundTransactionId.trim(), confirmed: true }),
+      })
+      if (res.status === 401 || res.status === 403) { onUnauthorized(); return }
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Unable to record refund.')
+      setOrder((prev) => prev ? { ...prev, paymentStatus: 'refunded', orderStatus: data.orderStatus } : null)
+      onOrderUpdated?.({ id: order.id, paymentStatus: 'refunded', orderStatus: data.orderStatus })
+      setActiveDialog(null)
+      await fetchAudit()
+    } catch (err: any) {
+      setActionError(err.message || 'Unable to record refund.')
     } finally {
       setActionPending(false)
     }
@@ -787,12 +817,32 @@ export function OrderDetailDrawer({
                       )}
 
                       {order.paymentStatus === 'paid' && (
+                        <>
                         <div className="flex items-center gap-1.5 text-xs text-emerald-800 font-semibold bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
                           Payment verified &bull; {order.paymentVerifiedAt ? formatDate(order.paymentVerifiedAt) : 'Confirmed'}
                         </div>
+                        <button
+                          onClick={() => {
+                            setRefundReason('')
+                            setRefundTransactionId('')
+                            setRefundConfirmed(false)
+                            setActionError(null)
+                            setActiveDialog({ type: 'refund_bkash' })
+                          }}
+                          disabled={actionPending}
+                          className="px-3.5 py-1.5 bg-white border border-purple-300 text-purple-800 text-xs font-medium rounded-lg hover:bg-purple-50 transition disabled:opacity-50"
+                        >
+                          Record bKash refund
+                        </button>
+                        </>
+                      )}
+                      {order.paymentStatus === 'refunded' && (
+                        <p className="text-xs text-purple-800 bg-purple-50 border border-purple-200 p-3 rounded-lg">
+                          Refund recorded. See the activity history for the refund reason and Transaction ID.
+                        </p>
                       )}
                     </div>
                   </div>
@@ -934,6 +984,9 @@ export function OrderDetailDrawer({
                       } else if (log.action === 'bkash_payment_verified') {
                         actionTitle = 'bKash payment verified'
                         detailText = `${log.metadata.from || 'pending'} → paid (৳${log.metadata.expectedAmount || order.finalTotal})`
+                      } else if (log.action === 'bkash_payment_refunded') {
+                        actionTitle = 'bKash refund recorded'
+                        detailText = `Paid → refunded (৳${log.metadata.amount ?? order.finalTotal}) · ${log.metadata.reason || ''}`
                       } else if (log.action === 'bkash_payment_failed') {
                         actionTitle = 'Payment marked failed'
                         detailText = log.metadata.reason ? `Reason: ${log.metadata.reason}` : 'bKash payment verification failed'
@@ -962,6 +1015,9 @@ export function OrderDetailDrawer({
                             <p className="text-stone-600 mt-1 rounded-md bg-orange-50 border border-orange-100 px-2 py-1.5 whitespace-pre-wrap">
                               Admin note: {log.metadata.adminNote}
                             </p>
+                          )}
+                          {log.metadata.refundTransactionId && (
+                            <p className="text-stone-600 mt-1 font-mono">Refund TrxID: {log.metadata.refundTransactionId}</p>
                           )}
                           {log.adminEmail && (
                             <p className="text-[11px] text-stone-400 mt-0.5">
@@ -996,7 +1052,30 @@ export function OrderDetailDrawer({
             role="alertdialog"
             aria-modal="true"
           >
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-stone-200 space-y-4">
+            <div className="bg-white rounded-2xl max-w-md w-full max-h-[calc(100dvh-2rem)] overflow-y-auto p-6 shadow-2xl border border-stone-200 space-y-4">
+              {actionError && <p role="alert" className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800">{actionError}</p>}
+              {activeDialog.type === 'refund_bkash' && (
+                <>
+                  <h3 className="text-base font-bold text-purple-900">Record bKash refund</h3>
+                  <p className="text-xs text-stone-600 leading-relaxed">
+                    Record a full refund of <strong>৳{order?.finalTotal}</strong> for <strong>{order?.orderNumber}</strong> after sending the money back in bKash. This action records the refund; fulfillment stays unchanged.
+                  </p>
+                  <label className="block text-xs font-semibold text-stone-700" htmlFor="refund-reason">Refund reason *</label>
+                  <textarea id="refund-reason" rows={3} maxLength={300} value={refundReason} onChange={(e) => setRefundReason(e.target.value)} className="w-full text-sm p-2.5 border border-stone-300 rounded-lg" placeholder="Why was this payment refunded?" disabled={actionPending} />
+                  <label className="block text-xs font-semibold text-stone-700" htmlFor="refund-trx">Refund Transaction ID *</label>
+                  <input id="refund-trx" maxLength={10} value={refundTransactionId} onChange={(e) => setRefundTransactionId(e.target.value.toUpperCase())} className="w-full text-sm font-mono p-2.5 border border-stone-300 rounded-lg" placeholder="Outgoing bKash TrxID" disabled={actionPending} />
+                  <label className="flex items-start gap-2 text-xs text-stone-600 leading-relaxed">
+                    <input type="checkbox" checked={refundConfirmed} onChange={(e) => setRefundConfirmed(e.target.checked)} disabled={actionPending} className="mt-0.5" />
+                    <span>I have sent the full amount back to the customer and verified this refund Transaction ID.</span>
+                  </label>
+                  <div className="flex justify-end gap-2">
+                    <button onClick={() => setActiveDialog(null)} disabled={actionPending} className="px-3.5 py-2 text-xs border border-stone-300 rounded-lg">Cancel</button>
+                    <button onClick={handleRefundBkash} disabled={actionPending || !refundConfirmed || refundReason.trim().length < 3 || !/^[A-Z0-9]{10}$/.test(refundTransactionId.trim())} className="px-3.5 py-2 text-xs font-semibold text-white bg-purple-700 rounded-lg disabled:opacity-50">
+                      {actionPending ? 'Recording…' : 'Confirm refund recorded'}
+                    </button>
+                  </div>
+                </>
+              )}
               {activeDialog.type === 'cancel_order' && (
                 <>
                   <h3 className="text-base font-bold text-rose-900">Cancel Order</h3>

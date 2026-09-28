@@ -1,7 +1,7 @@
 import express from 'express'
 import fs from 'node:fs'
 import helmet from 'helmet'
-import { GoogleGenAI } from '@google/genai'
+import { CHAT_MODEL, ChatBodySchema, generateHudHudReply } from './services/hudhudChat.js'
 import { validateServerEnvironment } from './lib/envValidation.js'
 import { calculateBasePricing, PricingValidationError } from './domain/pricing.js'
 import { validateAndCalculateCoupon, normalizeCouponCode } from './services/coupons.js'
@@ -16,6 +16,7 @@ import {
 import {
   updateOrderStatus,
   returnOrder,
+  refundBkashPayment,
   verifyBkashPayment,
   failBkashPayment,
   markCodPaid,
@@ -23,6 +24,7 @@ import {
   MutationConflictError,
   MutationValidationError,
   MutationNotFoundError,
+  MutationSetupError,
   ALLOWED_ORDER_STATUSES,
 } from './services/adminMutationService.js'
 import { z, ZodError } from 'zod'
@@ -175,46 +177,6 @@ export function checkAdminMutationRateLimit(ip: string): { allowed: boolean; mes
   record.timestamps.push(now)
   return { allowed: true }
 }
-
-// Single Gemini model strictly enforced across the application
-const CHAT_MODEL = 'gemini-3.1-flash-lite'
-const MAX_OUTPUT_TOKENS = 300
-const MAX_HISTORY_MESSAGES = 4
-const MAX_PROMPT_CHARS = 400
-
-const systemInstruction = `You are the FOCUSO Companion, a concise, calm product assistant for the FOCUSO Daily Planner.
-
-Authoritative FOCUSO Rules:
-1. Product & Pricing:
-- FOCUSO Daily Planner (undated 60-day system, A5 format).
-- Price: ৳250 per planner (Bangladeshi Taka).
-
-2. Delivery Charges:
-- Chattogram district: ৳60
-- All other Bangladesh districts (Dhaka, Sylhet, Rajshahi, etc.): ৳100
-- Delivery timeframe: An exact delivery timeframe is not currently specified in the system. Do not invent or promise any timeframe (such as 2–3 days). If asked how long delivery takes, state clearly that an exact delivery timeframe is not currently specified.
-
-3. Coupon (FOCUS25):
-- Code: FOCUS25
-- Discount: 25% off the product subtotal only.
-- Fractional taka discount is rounded down using Math.floor().
-- Delivery charge is NEVER discounted.
-
-4. Payment Methods & Ordering:
-- Cash on Delivery (COD): Pay cash when the parcel is delivered.
-- Manual bKash Send Money: Customers send money manually to the provided personal bKash number and submit the Transaction ID (TrxID) during checkout. Manual bKash payments remain in "pending verification" status until verified by an admin.
-- IMPORTANT: Do NOT describe manual bKash as an official or automated "bKash Payment Gateway". It is strictly manual bKash Send Money.
-- Guest Checkout: Orders are placed via instant guest checkout on the website—no customer account or password is required.
-
-5. Product Features & Philosophy:
-- Features: Monthly intentions, weekly bridges, daily planner page with hourly schedule starting from Fajr, top 3 priorities, daily task checklist, 5 daily Salah tracker, weekly habit grid, and daily Qur'an reading space.
-- Philosophy: "Plan what matters. Stay consistent. Muslim by design — not by decoration."
-
-Tone & Behavioral Rules:
-- Keep answers concise, factual, polite, and helpful (under 2 short paragraphs).
-- Answer questions directly from these authoritative rules.
-- If asked in Bengali, reply naturally and respectfully in Bengali; if in English, reply in English.
-- Do not ramble, do not write essays, and do not invent policies or timeframes not listed above.`
 
 export const app = express()
 
@@ -657,8 +619,40 @@ function configureApp() {
       if (err instanceof MutationValidationError) {
         return res.status(400).json({ error: err.message, code: err.code })
       }
+      if (err instanceof MutationSetupError) {
+        return res.status(503).json({ error: err.message, code: err.code })
+      }
       console.error('[AdminAPI] Failed to record returned order:', err?.message || err)
       return res.status(500).json({ error: 'Failed to record returned order.' })
+    }
+  })
+
+  const RefundBkashBodySchema = z.object({
+    reason: z.string().trim().min(3).max(300),
+    refundTransactionId: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{10}$/),
+    confirmed: z.literal(true),
+  }).strict()
+
+  app.post('/api/admin/orders/:id/refund-bkash', requireAdmin, async (req, res) => {
+    try {
+      const rateCheck = checkAdminMutationRateLimit(getClientIp(req))
+      if (!rateCheck.allowed) return res.status(429).json({ error: rateCheck.message, code: 'rate_limited' })
+      const orderId = String(req.params.id)
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orderId)) {
+        return res.status(400).json({ error: 'Valid order UUID is required.' })
+      }
+      const parsed = RefundBkashBodySchema.safeParse(req.body)
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Provide a refund reason, a valid 10-character refund Transaction ID, and confirmation that the money was sent back.' })
+      }
+      return res.json(await refundBkashPayment(orderId, parsed.data.reason, parsed.data.refundTransactionId, req.adminUser!))
+    } catch (err: any) {
+      if (err instanceof MutationNotFoundError) return res.status(404).json({ error: err.message })
+      if (err instanceof MutationConflictError) return res.status(409).json({ error: err.message, code: err.code })
+      if (err instanceof MutationValidationError) return res.status(400).json({ error: err.message, code: err.code })
+      if (err instanceof MutationSetupError) return res.status(503).json({ error: err.message, code: err.code })
+      console.error('[AdminAPI] Failed to record bKash refund:', err?.message || err)
+      return res.status(500).json({ error: 'Failed to record bKash refund.' })
     }
   })
 
@@ -816,7 +810,7 @@ function configureApp() {
     try {
       const apiKey = process.env.GEMINI_API_KEY
       if (!apiKey) {
-        return res.status(500).json({ error: 'GEMINI_API_KEY is not configured on the server.' })
+        return res.status(503).json({ error: 'HudHud couldn’t connect right now. Please try again in a moment.' })
       }
 
       // Per-IP rate limiting
@@ -830,69 +824,23 @@ function configureApp() {
         })
       }
 
-      const { messages } = req.body
-
-      if (!Array.isArray(messages) || messages.length === 0) {
-        return res.status(400).json({ error: 'Invalid or empty messages array provided.' })
+      const parsed = ChatBodySchema.safeParse(req.body)
+      if (!parsed.success) {
+        return res.status(400).json({ error: 'Send a valid conversation ending with a user message of at most 400 characters.' })
       }
-
-      // Input validation and pruning: keep only the last MAX_HISTORY_MESSAGES
-      const sanitizedMessages = messages
-        .filter((m) => m && typeof m.text === 'string' && m.text.trim())
-        .slice(-MAX_HISTORY_MESSAGES)
-        .map((m) => {
-          const role = m.role === 'assistant' || m.role === 'model' ? 'model' : 'user'
-          const text = String(m.text).slice(0, MAX_PROMPT_CHARS).trim()
-          return {
-            role,
-            parts: [{ text }],
-          }
-        })
-
-      if (sanitizedMessages.length === 0) {
-        return res.status(400).json({ error: 'Message content is empty or invalid.' })
-      }
-
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: {
-          headers: {
-            'User-Agent': 'aistudio-build',
-          },
-        },
-      })
-
-      // Strictly use ONLY gemini-3.1-flash-lite, with zero fallback to billable models
-      const response = await ai.models.generateContent({
-        model: CHAT_MODEL,
-        contents: sanitizedMessages,
-        config: {
-          systemInstruction,
-          temperature: 0.6,
-          maxOutputTokens: MAX_OUTPUT_TOKENS,
-        },
-      })
-
-      const reply = response.text || ''
-      return res.json({ reply, model: CHAT_MODEL })
+      return res.json(await generateHudHudReply(parsed.data, apiKey))
     } catch (err: unknown) {
-      console.error(`Gemini (${CHAT_MODEL}) generation error:`, err)
       const errStatus = (err as { status?: number })?.status
-      const errMsg = err instanceof Error ? err.message : String(err)
+      // Log a classification only; SDK error payloads may contain sensitive data.
+      console.error('[HudHud] generation failed', { model: CHAT_MODEL, status: errStatus || 'unavailable' })
       const isQuotaOrBusy =
         errStatus === 429 ||
-        errStatus === 503 ||
-        errMsg.includes('429') ||
-        errMsg.includes('quota') ||
-        errMsg.includes('RESOURCE_EXHAUSTED') ||
-        errMsg.includes('503') ||
-        errMsg.includes('UNAVAILABLE') ||
-        errMsg.includes('high demand')
+        errStatus === 503
 
-      return res.status(isQuotaOrBusy ? 429 : 500).json({
+      return res.status(isQuotaOrBusy ? 429 : 503).json({
         error: isQuotaOrBusy
-          ? 'The assistant is currently at capacity or resting. Please try again in a few moments or proceed with ordering.'
-          : 'Unable to reach the assistant at this time.',
+          ? 'HudHud is temporarily unavailable. Please try again in a few moments.'
+          : 'HudHud couldn’t connect right now. Please try again in a moment.',
         quotaExceeded: isQuotaOrBusy,
       })
     }

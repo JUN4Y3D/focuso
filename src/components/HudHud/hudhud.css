@@ -58,13 +58,14 @@
 .hudhud-dialog[open] { display: flex; flex-direction: column; animation: hudhud-panel 180ms cubic-bezier(.2,.7,.2,1); }
 .hudhud-dialog::backdrop { background: rgba(30,45,36,.16); }
 @keyframes hudhud-panel { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
-.hudhud-dialog > header { display: flex; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid rgba(40,94,73,.13); background: var(--color-soft-green); }
+.hudhud-dialog > header { display: flex; flex-shrink: 0; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid rgba(40,94,73,.13); background: var(--color-soft-green); }
 .hudhud-avatar { width: 44px; flex-shrink: 0; }
 .hudhud-dialog > header h2 { font-size: 22px; line-height: 1.2; }
 .hudhud-dialog > header p { margin-top: 5px; font-size: 12px; }
 .hudhud-dialog > header button { margin-left: auto; min-width: 44px; min-height: 44px; display: grid; place-items: center; }
 .hudhud-dialog input { min-width: 0; font-size: 16px; }
 .hudhud-dialog form { padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
+.hudhud-dialog > form, .hudhud-dialog > a, .hudhud-dialog > .hudhud-suggestions { flex-shrink: 0; }
 .hudhud-dialog button[type='submit'] { min-width: 44px; min-height: 44px; }
 .hudhud-starters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .hudhud-starters button { min-height: 40px; text-align: left; font-size: 12px; line-height: 1.5; padding: 8px 10px; border: 1px solid rgba(40,94,73,.16); border-radius: 5px; background: white; }
@@ -74,9 +75,9 @@
   .hudhud-trigger { width: 64px; height: 87px; }
   .hudhud-flight { width: 64px; height: 64px; }
   .hudhud-branch { width: 64px; top: 46px; }
-  .hudhud-dialog { inset: auto 8px max(8px, env(safe-area-inset-bottom, 0px)) 8px; width: auto; height: min(640px, calc(100dvh - 16px)); }
+  .hudhud-dialog { inset: calc(var(--hudhud-viewport-top, 0px) + 8px) 8px auto; width: auto; height: min(640px, calc(var(--hudhud-viewport-height, 100dvh) - 16px)); }
 }
-@media (max-height: 500px) { .hudhud-dialog { inset: 8px; width: auto; height: calc(100dvh - 16px); } .hudhud-dialog .hudhud-suggestions { display: none; } }
+@media (max-height: 500px) { .hudhud-dialog { inset: calc(var(--hudhud-viewport-top, 0px) + 8px) 8px auto; width: auto; height: calc(var(--hudhud-viewport-height, 100dvh) - 16px); } .hudhud-dialog .hudhud-suggestions { display: none; } }
 @media (prefers-reduced-motion: reduce) {
   .hudhud-flight, .hudhud-dialog[open] { animation: none !important; transform: none !important; opacity: 1 !important; }
   .hudhud-bird, .hudhud-tooltip { transition: none; }

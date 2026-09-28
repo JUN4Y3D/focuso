@@ -10,7 +10,7 @@
  * 6. "How long will delivery take?"
  *
  * Also verifies:
- * - Configured model is strictly gemini-3.1-flash-lite
+ * - Configured model is strictly gemini-3.8-flash
  * - No invented timeframe for #6
  * - Correct Chattogram (৳60) vs Dhaka (৳100) delivery charges
  * - FOCUS25 25% discount on product subtotal only
@@ -51,7 +51,7 @@ async function askChatbot(promptText: string): Promise<{ reply: string; model: s
   }
 
   assert.equal(res?.status, 200, `Expected HTTP 200 for prompt "${promptText}", got ${res?.status}: ${JSON.stringify(data)}`)
-  assert.equal(data.model, 'gemini-3.1-flash-lite', `Expected model gemini-3.1-flash-lite, got ${data.model}`)
+  assert.equal(data.model, 'gemini-3.8-flash', `Expected model gemini-3.8-flash, got ${data.model}`)
   return { reply: data.reply, model: data.model }
 }
 
@@ -135,7 +135,7 @@ async function runKnowledgeTests() {
 
   console.log('===============================================================')
   console.log('ALL 6 AUTHORITATIVE KNOWLEDGE TESTS PASSED')
-  console.log('Model confirmed on all responses: gemini-3.1-flash-lite')
+  console.log('Model confirmed on all responses: gemini-3.8-flash')
   console.log('===============================================================')
 }
 

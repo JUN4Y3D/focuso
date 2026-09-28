@@ -35,6 +35,14 @@ export class MutationNotFoundError extends Error {
   }
 }
 
+export class MutationSetupError extends Error {
+  public readonly code = 'workflow_setup_required'
+  constructor() {
+    super('Return/refund workflow is not enabled in the database yet. Apply the return and refund migrations before using this action.')
+    this.name = 'MutationSetupError'
+  }
+}
+
 export interface AdminAuditEntry {
   id: string
   action: string
@@ -77,6 +85,11 @@ export type OrderStatusType = (typeof ALLOWED_ORDER_STATUSES)[number]
  */
 function handleRpcError(error: any): never {
   const rawMessage = (error?.message || '').trim()
+
+  if (error?.code === 'PGRST202' || error?.code === '42883' ||
+      (error?.code === '23514' && rawMessage.includes('orders_order_status_check'))) {
+    throw new MutationSetupError()
+  }
 
   if (rawMessage === 'ORDER_NOT_FOUND' || rawMessage.includes('ORDER_NOT_FOUND')) {
     throw new MutationNotFoundError('Order not found.')
@@ -166,6 +179,39 @@ export async function updateOrderStatus(
     orderId: data.orderId || orderId,
     orderStatus: data.to || targetStatus,
     fromStatus: data.from || targetStatus,
+  }
+}
+
+/** Records a completed manual refund; does not transfer money or alter fulfillment. */
+export async function refundBkashPayment(
+  orderId: string,
+  reason: string,
+  refundTransactionId: string,
+  adminUser: { id: string; email: string }
+): Promise<{ orderId: string; paymentStatus: 'refunded'; orderStatus: string; alreadyRefunded: boolean }> {
+  const cleanReason = reason.trim()
+  const transactionId = refundTransactionId.trim().toUpperCase()
+  if (cleanReason.length < 3 || cleanReason.length > 300) {
+    throw new MutationValidationError('invalid_reason', 'Refund reason must be between 3 and 300 characters.')
+  }
+  if (!/^[A-Z0-9]{10}$/.test(transactionId)) {
+    throw new MutationValidationError('invalid_reference', 'Enter a valid 10-character bKash refund Transaction ID.')
+  }
+  const admin = getSupabaseAdmin()
+  if (!admin) throw new Error('Supabase admin client not initialized.')
+  const { data, error } = await admin.rpc('admin_refund_bkash_payment', {
+    p_order_id: orderId,
+    p_reason: cleanReason,
+    p_refund_transaction_id: transactionId,
+    p_admin_id: adminUser.id,
+    p_admin_email: adminUser.email,
+  })
+  if (error) handleRpcError(error)
+  return {
+    orderId: data.orderId,
+    paymentStatus: 'refunded',
+    orderStatus: data.orderStatus,
+    alreadyRefunded: Boolean(data.alreadyRefunded),
   }
 }
 
@@ -430,6 +476,7 @@ export async function getOrderAuditHistory(orderId: string): Promise<AdminAuditE
     if (meta.to !== undefined) sanitizedMeta.to = meta.to
     if (meta.reason !== undefined) sanitizedMeta.reason = meta.reason
     if (meta.adminNote !== undefined) sanitizedMeta.adminNote = meta.adminNote
+    if (meta.refundTransactionId !== undefined) sanitizedMeta.refundTransactionId = meta.refundTransactionId
     if (meta.expectedAmount !== undefined) sanitizedMeta.expectedAmount = meta.expectedAmount
     if (meta.transactionId !== undefined) sanitizedMeta.transactionId = meta.transactionId
     if (meta.amount !== undefined) sanitizedMeta.amount = meta.amount
