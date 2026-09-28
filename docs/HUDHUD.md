@@ -1,5 +1,19 @@
 # HudHud assistant UI
 
+## Current provider and conversation memory
+
+HudHud uses Cloudflare Workers AI `@cf/zai-org/glm-4.7-flash`, not Gemini.
+The server owns the system prompt and credentials; the browser sends only bounded
+`user`/`assistant` messages with `content`. Six complete recent turns plus the
+current user are retained within a 6,000-character request budget. Successful
+turns are stored in versioned same-tab `sessionStorage` and restored after refresh
+or remount. Errors, pending sends and the greeting are not AI context or persisted.
+See [current setup, privacy and manual tests](HUDHUD_CLOUDFLARE.md).
+
+The visible Bird call credit UI has been removed; the licensed sound and its
+public attribution page remain. Historical implementation/QA notes below are
+retained as history, not the current persistence/provider contract.
+
 ## Current creative flight and click sound
 
 This section supersedes the historical session/delay/silence descriptions below.
@@ -23,7 +37,7 @@ Recording: Vladimir Yu. Arkhipov (Arkhivov), “Upupa epops”, 28 April 2004,
 https://commons.wikimedia.org/wiki/File:Upupa_epops.ogg — CC BY-SA 3.0.
 The 0.16–0.90s excerpt is anti-alias filtered/resampled and gently faded. The edited
 audio is also CC BY-SA 3.0. Public attribution/change/license details are served at
-`/audio/hudhud-call-license.html`, linked by a small bilingual chat credit.
+`/audio/hudhud-call-license.html`; no credit link appears in the chat panel.
 
 QA: timed screenshots at 1440×900, 768×1024, 375×812 and 812×375 showed flight and
 the unchanged resting location without horizontal overflow. Browser refresh replayed
@@ -102,8 +116,9 @@ The application currently has a light-only theme; this change does not add dark 
 
 ## Persistence and validation limits
 
-Chat remains component-memory-only, as before: close/reopen retains it; reload or
-component remount clears it. Only the arrival flag is stored, not conversation data.
+Historical QA of the earlier implementation: chat was component-memory-only;
+close/reopen retained it but reload/remount cleared it. This is superseded by the
+current versioned session storage implementation described above.
 Desktop 1440×900, tablet 768×1024 and mobile 375×812 were visually checked, including
 Escape/focus restoration and the static preview's graceful unavailable-API response.
 Reduced-motion support is implemented in CSS and the hook; physical mobile keyboard

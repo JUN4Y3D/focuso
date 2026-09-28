@@ -6,7 +6,8 @@
 export interface ValidatedServerEnv {
   supabaseUrl: string
   supabaseSecretKey: string
-  geminiApiKey: string
+  cloudflareAccountId: string
+  cloudflareApiToken: string
   bkashSendMoneyNumber: string
   nodeEnv: string
   port: number
@@ -25,10 +26,10 @@ export function validateServerEnvironment(): ValidatedServerEnv {
     missing.push('SUPABASE_SECRET_KEY')
   }
 
-  const geminiApiKey = (process.env.GEMINI_API_KEY || '').trim()
-  if (!geminiApiKey) {
-    missing.push('GEMINI_API_KEY')
-  }
+  const cloudflareAccountId = (process.env.CLOUDFLARE_ACCOUNT_ID || '').trim()
+  if (!cloudflareAccountId) missing.push('CLOUDFLARE_ACCOUNT_ID')
+  const cloudflareApiToken = (process.env.CLOUDFLARE_API_TOKEN || '').trim()
+  if (!cloudflareApiToken) missing.push('CLOUDFLARE_API_TOKEN')
 
   const bkashSendMoneyNumber = (process.env.BKASH_SEND_MONEY_NUMBER || '').trim()
   if (!bkashSendMoneyNumber) {
@@ -44,6 +45,12 @@ export function validateServerEnvironment(): ValidatedServerEnv {
   }
 
   // Basic format sanity checks without logging values
+  if (!/^[a-f0-9]{32}$/i.test(cloudflareAccountId)) {
+    throw new Error('[Startup Validation Error] CLOUDFLARE_ACCOUNT_ID must be a 32-character hexadecimal account ID.')
+  }
+  if (/[\r\n]/.test(cloudflareApiToken)) {
+    throw new Error('[Startup Validation Error] CLOUDFLARE_API_TOKEN must not contain line breaks.')
+  }
   if (!supabaseUrl.startsWith('https://') && !supabaseUrl.startsWith('http://')) {
     throw new Error('[Startup Validation Error] SUPABASE_URL must be a valid HTTP/HTTPS URL.')
   }
@@ -57,7 +64,8 @@ export function validateServerEnvironment(): ValidatedServerEnv {
   return {
     supabaseUrl,
     supabaseSecretKey,
-    geminiApiKey,
+    cloudflareAccountId,
+    cloudflareApiToken,
     bkashSendMoneyNumber,
     nodeEnv: process.env.NODE_ENV || 'development',
     port: Number(process.env.PORT) || 3000,

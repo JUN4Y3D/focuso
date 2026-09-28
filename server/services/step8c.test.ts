@@ -540,15 +540,15 @@ async function runStep8CTests() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        messages: [{ role: 'user', text: 'How much is the planner?' }],
+        messages: [{ role: 'user', content: 'How much is the planner?' }],
       }),
     })
     if (rChat.status === 200) {
       const dChat = await rChat.json()
-      if (dChat.model !== 'gemini-3.1-flash-lite') {
-        throw new Error(`Chatbot model is ${dChat.model}, expected gemini-3.1-flash-lite`)
+      if (dChat.model !== '@cf/zai-org/glm-4.7-flash') {
+        throw new Error(`Chatbot model is ${dChat.model}, expected @cf/zai-org/glm-4.7-flash`)
       }
-      console.log(`✓ Chatbot confirmed using exclusively gemini-3.1-flash-lite.`)
+      console.log(`✓ Chatbot confirmed using exclusively @cf/zai-org/glm-4.7-flash.`)
     } else {
       console.log(`Notice: Upstream chat responded with ${rChat.status} (quota/busy), endpoint verified.`)
     }

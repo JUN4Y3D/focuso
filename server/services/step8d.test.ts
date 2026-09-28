@@ -403,7 +403,7 @@ export async function runStep8DTests() {
     const chatRes = await fetch(`${BASE_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'What is the price of the planner and delivery in Chattogram?' }),
+      body: JSON.stringify({ messages: [{ role: 'user', content: 'What is the price of the planner and delivery in Chattogram?' }] }),
     })
     if (chatRes.status === 200) {
       const chatData = await chatRes.json()

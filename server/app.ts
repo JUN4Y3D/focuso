@@ -1,7 +1,7 @@
 import express from 'express'
 import fs from 'node:fs'
 import helmet from 'helmet'
-import { CHAT_MODEL, ChatBodySchema, generateHudHudReply } from './services/hudhudChat.js'
+import { CHAT_MODEL, ChatBodySchema, generateHudHudReply, HudHudProviderError, hudHudErrorResponse } from './services/hudhudChat.js'
 import { validateServerEnvironment } from './lib/envValidation.js'
 import { calculateBasePricing, PricingValidationError } from './domain/pricing.js'
 import { validateAndCalculateCoupon, normalizeCouponCode } from './services/coupons.js'
@@ -29,7 +29,7 @@ import {
 } from './services/adminMutationService.js'
 import { z, ZodError } from 'zod'
 
-// Load .env if present (overwriting dummy placeholder if needed)
+// Load local .env without overriding deployment-provided values.
 if (fs.existsSync('.env')) {
   try {
     const envContent = fs.readFileSync('.env', 'utf-8')
@@ -40,7 +40,7 @@ if (fs.existsSync('.env')) {
         let val = (match[2] || '').trim()
         if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1)
         if (val.startsWith("'") && val.endsWith("'")) val = val.slice(1, -1)
-        if (val && (process.env[key] === 'MY_GEMINI_API_KEY' || !process.env[key])) {
+        if (val && !process.env[key]) {
           process.env[key] = val
         }
       }
@@ -63,7 +63,7 @@ export function getClientIp(req: express.Request): string {
   return req.socket.remoteAddress || '127.0.0.1'
 }
 
-// In-memory sliding window rate limiter to protect the Gemini Free Tier quota
+// In-memory sliding window rate limiter to protect the AI provider quota.
 interface RateLimitRecord {
   timestamps: number[]
 }
@@ -78,7 +78,7 @@ setInterval(() => {
       ipChatHistory.delete(ip)
     }
   }
-}, 10 * 60 * 1000)
+}, 10 * 60 * 1000).unref() // Cleanup must not keep a closed server/test process alive.
 
 export function checkRateLimit(ip: string): { allowed: boolean; message?: string } {
   const now = Date.now()
@@ -805,13 +805,12 @@ function configureApp() {
     }
   })
 
-  // Single-model Gemini API Chat Endpoint with abuse protection
+  // Single-model Cloudflare Workers AI endpoint with unchanged abuse protection.
   app.post('/api/chat', async (req, res) => {
     try {
-      const apiKey = process.env.GEMINI_API_KEY
-      if (!apiKey) {
-        return res.status(503).json({ error: 'HudHud couldn’t connect right now. Please try again in a moment.' })
-      }
+      const accountId = (process.env.CLOUDFLARE_ACCOUNT_ID || '').trim()
+      const apiToken = (process.env.CLOUDFLARE_API_TOKEN || '').trim()
+      if (!accountId || !apiToken) throw new HudHudProviderError('configuration')
 
       // Per-IP rate limiting
       const clientIp = getClientIp(req)
@@ -828,21 +827,14 @@ function configureApp() {
       if (!parsed.success) {
         return res.status(400).json({ error: 'Send a valid conversation ending with a user message of at most 400 characters.' })
       }
-      return res.json(await generateHudHudReply(parsed.data, apiKey))
+      return res.json(await generateHudHudReply(parsed.data, { accountId, apiToken }))
     } catch (err: unknown) {
-      const errStatus = (err as { status?: number })?.status
-      // Log a classification only; SDK error payloads may contain sensitive data.
-      console.error('[HudHud] generation failed', { model: CHAT_MODEL, status: errStatus || 'unavailable' })
-      const isQuotaOrBusy =
-        errStatus === 429 ||
-        errStatus === 503
-
-      return res.status(isQuotaOrBusy ? 429 : 503).json({
-        error: isQuotaOrBusy
-          ? 'HudHud is temporarily unavailable. Please try again in a few moments.'
-          : 'HudHud couldn’t connect right now. Please try again in a moment.',
-        quotaExceeded: isQuotaOrBusy,
+      const failure = hudHudErrorResponse(err)
+      console.error('[HudHud] generation failed', {
+        model: CHAT_MODEL, category: failure.body.code,
+        status: err instanceof HudHudProviderError ? err.upstreamStatus || 'unavailable' : 'unavailable',
       })
+      return res.status(failure.status).json(failure.body)
     }
   })
 

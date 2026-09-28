@@ -1,23 +1,25 @@
-import { GoogleGenAI, ThinkingLevel, FinishReason } from '@google/genai'
 import { z } from 'zod'
 import { PRICING_CONFIG } from '../domain/pricing.js'
 import {
-  HUDHUD_INPUT_CHARS, HUDHUD_REPLY_CHARS, HUDHUD_SESSION_MESSAGES,
-  recentHudHudContext,
+  HUDHUD_INPUT_CHARS, HUDHUD_REPLY_CHARS, HUDHUD_CONTEXT_MESSAGES, HUDHUD_CONTEXT_CHARS,
 } from '../../src/lib/hudhudConversation.js'
 
-export const CHAT_MODEL = 'gemini-3.5-flash-lite'
+export const CHAT_MODEL = '@cf/zai-org/glm-4.7-flash'
 export const MAX_OUTPUT_TOKENS = 350
+export const HUDHUD_TIMEOUT_MS = 25000
 
 const messageSchema = z.discriminatedUnion('role', [
-  z.object({ role: z.literal('user'), text: z.string().trim().min(1).max(HUDHUD_INPUT_CHARS) }).strict(),
-  z.object({ role: z.literal('model'), text: z.string().trim().min(1).max(HUDHUD_REPLY_CHARS) }).strict(),
-  z.object({ role: z.literal('assistant'), text: z.string().trim().min(1).max(HUDHUD_REPLY_CHARS) }).strict(),
+  z.object({ role: z.literal('user'), content: z.string().max(HUDHUD_INPUT_CHARS).trim().min(1) }).strict(),
+  z.object({ role: z.literal('assistant'), content: z.string().max(HUDHUD_REPLY_CHARS).trim().min(1) }).strict(),
 ])
 
 export const ChatBodySchema = z.object({
-  messages: z.array(messageSchema).min(1).max(HUDHUD_SESSION_MESSAGES)
-    .refine(messages => messages[messages.length - 1]?.role === 'user', 'The last message must be from the user.'),
+  messages: z.array(messageSchema).min(1).max(HUDHUD_CONTEXT_MESSAGES)
+    .refine(messages => messages.length % 2 === 1
+      && messages.every((message, index) => message.role === (index % 2 ? 'assistant' : 'user')),
+    'Send complete chronological user/assistant turns followed by the current user message.')
+    .refine(messages => messages.reduce((sum, message) => sum + message.content.length, 0) <= HUDHUD_CONTEXT_CHARS,
+      'Conversation exceeds the total character budget.'),
 }).strict()
 
 // Price and quantity values come from the same constants used by checkout.
@@ -56,27 +58,85 @@ export function completeHudHudReply(text: string, truncated: boolean): string {
   return last?.index !== undefined ? bounded.slice(0, last.index + 1).trim() : ''
 }
 
-export async function generateHudHudReply(body: z.infer<typeof ChatBodySchema>, apiKey: string) {
-  const messages = recentHudHudContext(body.messages.map(message => ({
-    role: message.role === 'assistant' ? 'model' as const : message.role,
-    text: message.text,
-  })))
-  const ai = new GoogleGenAI({
-    apiKey,
-    httpOptions: { timeout: 25000, retryOptions: { attempts: 1 } },
-  })
-  const response = await ai.models.generateContent({
-    model: CHAT_MODEL,
-    contents: messages.map(message => ({ role: message.role, parts: [{ text: message.text }] })),
-    config: {
-      systemInstruction: HUDHUD_SYSTEM_INSTRUCTION,
-      maxOutputTokens: MAX_OUTPUT_TOKENS,
-      thinkingConfig: { thinkingLevel: ThinkingLevel.LOW, includeThoughts: false },
+type ProviderFailure = 'configuration' | 'quota' | 'availability' | 'timeout' | 'network' | 'request' | 'response'
+
+export class HudHudProviderError extends Error {
+  constructor(public readonly category: ProviderFailure, public readonly upstreamStatus?: number) {
+    super(`HUDHUD_PROVIDER_${category.toUpperCase()}`)
+  }
+}
+
+/** Safe API classification: never return/log Cloudflare payloads, URLs or credentials. */
+export function hudHudErrorResponse(error: unknown) {
+  const failure = error instanceof HudHudProviderError ? error : new HudHudProviderError('availability')
+  const quotaExceeded = failure.category === 'quota'
+  const status = quotaExceeded ? 429 : failure.category === 'timeout' ? 504
+    : ['request', 'response'].includes(failure.category) ? 502 : 503
+  return {
+    status,
+    body: {
+      error: quotaExceeded
+        ? 'HudHud is temporarily unavailable. Please try again in a few moments.'
+        : 'HudHud couldn’t connect right now. Please try again in a moment.',
+      code: `hudhud_${failure.category}`,
+      quotaExceeded,
     },
-  })
-  const candidate = response.candidates?.[0]
-  const visibleText = candidate?.content?.parts?.filter(part => !part.thought).map(part => part.text || '').join('') || ''
-  const reply = completeHudHudReply(visibleText, candidate?.finishReason === FinishReason.MAX_TOKENS)
-  if (!reply) throw new Error('HUDHUD_EMPTY_OR_INCOMPLETE_REPLY')
-  return { reply, model: CHAT_MODEL }
+  }
+}
+
+const cloudflareResponseSchema = z.object({
+  success: z.literal(true),
+  result: z.object({
+    choices: z.array(z.object({
+      message: z.object({ role: z.literal('assistant'), content: z.string().nullable() }),
+      finish_reason: z.enum(['stop', 'length', 'tool_calls', 'content_filter', 'function_call']),
+    })).min(1),
+  }),
+})
+
+export async function generateHudHudReply(
+  body: z.infer<typeof ChatBodySchema>,
+  credentials: { accountId: string; apiToken: string },
+) {
+  if (!/^[a-f0-9]{32}$/i.test(credentials.accountId) || !credentials.apiToken.trim()
+    || /[\r\n]/.test(credentials.apiToken)) throw new HudHudProviderError('configuration')
+  const { messages } = ChatBodySchema.parse(body)
+  let response: Response
+  try {
+    // Documented model schema: no SDK, fallback, tools, retries, or Google thinking fields.
+    response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${credentials.accountId}/ai/run/${CHAT_MODEL}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${credentials.apiToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [{ role: 'system', content: HUDHUD_SYSTEM_INSTRUCTION }, ...messages],
+        max_completion_tokens: MAX_OUTPUT_TOKENS,
+        chat_template_kwargs: { enable_thinking: false },
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(HUDHUD_TIMEOUT_MS),
+    })
+    if (!response.ok) {
+      const category: ProviderFailure = response.status === 401 || response.status === 403 ? 'configuration'
+        : response.status === 429 ? 'quota' : response.status >= 500 ? 'availability' : 'request'
+      // Do not read or expose provider error bodies.
+      await response.body?.cancel().catch(() => undefined)
+      throw new HudHudProviderError(category, response.status)
+    }
+    const parsed = cloudflareResponseSchema.safeParse(await response.json())
+    if (!parsed.success) throw new HudHudProviderError('response', response.status)
+    const candidate = parsed.data.result.choices[0]
+    // Read visible content only, never reasoning/usage/tool payloads. Fail closed on inline thoughts.
+    const visibleText = candidate.message.content || ''
+    if (!['stop', 'length'].includes(candidate.finish_reason) || /<\/?think(?:ing)?\b/i.test(visibleText)) {
+      throw new HudHudProviderError('response', response.status)
+    }
+    const reply = completeHudHudReply(visibleText, candidate.finish_reason === 'length')
+    if (!reply) throw new HudHudProviderError('response', response.status)
+    return { reply, model: CHAT_MODEL }
+  } catch (error: unknown) {
+    if (error instanceof HudHudProviderError) throw error
+    const name = error instanceof Error ? error.name : ''
+    throw new HudHudProviderError(name === 'TimeoutError' || name === 'AbortError' ? 'timeout'
+      : error instanceof SyntaxError ? 'response' : 'network')
+  }
 }

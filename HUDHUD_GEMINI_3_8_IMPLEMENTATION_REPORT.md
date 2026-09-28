@@ -1,5 +1,10 @@
 # HudHud Gemini 3.8 Implementation Report
 
+Archived historical report. Its model, credentials and generation settings are
+not current. HudHud now uses Cloudflare GLM-4.7-Flash; see
+[the current implementation report](HUDHUD_CLOUDFLARE_IMPLEMENTATION_REPORT.md)
+and [setup guide](docs/HUDHUD_CLOUDFLARE.md).
+
 ## Current HudHud Audit
 
 The existing React companion uses a native dialog, bilingual starters, an in-memory conversation, a synchronous duplicate-send guard, and one Express `/api/chat` endpoint. Before this change, Gemini 3.1 Flash-Lite had a 300-token ceiling, temperature 0.6, no explicit thinking configuration, and four history messages truncated to 400 characters each. The application limits were 8 requests/minute/IP and 30/hour/IP. The JSON body ceiling was 20 KB.

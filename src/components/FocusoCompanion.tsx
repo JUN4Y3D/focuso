@@ -2,15 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { IconClose, IconArrow } from './primitives'
 import { useLang } from '../i18n'
 import { HudHudBird, HudHudTrigger } from './HudHud/HudHudTrigger'
-import { HUDHUD_INPUT_CHARS, HUDHUD_SESSION_MESSAGES, recentHudHudContext } from '../lib/hudhudConversation'
-
-export interface Message {
-  id: string
-  role: 'user' | 'model'
-  text: string
-  createdAt?: string
-  isNotice?: boolean
-}
+import {
+  HUDHUD_INPUT_CHARS, HUDHUD_REPLY_CHARS, HUDHUD_SESSION_MESSAGES, recentHudHudContext,
+  completedHudHudMessages, restoreHudHudSession, persistHudHudSession,
+  type HudHudDisplayMessage as Message,
+} from '../lib/hudhudConversation'
 
 const STARTER_PROMPTS_EN = [
   'Plan my day',
@@ -31,16 +27,18 @@ export function FocusoCompanion() {
   const [isOpen, setIsOpen] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<Message[]>(() => [
     {
       id: 'welcome',
-      role: 'model',
-      text:
+      role: 'assistant',
+      content:
         lang === 'bn'
           ? 'আসসালামু আলাইকুম 👋 আজ কোন কাজে মনোযোগ দিতে চান?'
           : 'Assalamu Alaikum 👋 What would you like help focusing on today?',
     },
+    ...restoreHudHudSession(),
   ])
+  const messagesRef = useRef(messages)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -49,8 +47,14 @@ export function FocusoCompanion() {
   const inputRef = useRef<HTMLInputElement>(null)
   const nearBottomRef = useRef(true)
 
-  function appendMessage(message: Message) {
-    setMessages(previous => [previous[0], ...[...previous.slice(1), message].slice(-HUDHUD_SESSION_MESSAGES)])
+  function updateMessages(next: Message[]) {
+    // Synchronous source of truth avoids stale render snapshots between consecutive sends.
+    const thread = next.slice(1).slice(-HUDHUD_SESSION_MESSAGES)
+    while (thread[0]?.role === 'assistant') thread.shift()
+    const bounded = [next[0], ...thread]
+    messagesRef.current = bounded
+    setMessages(bounded)
+    persistHudHudSession(bounded)
   }
 
   // VisualViewport tracks the space above the mobile software keyboard.
@@ -87,9 +91,9 @@ export function FocusoCompanion() {
 
   // Keep the greeting aligned with the selected language without replacing conversation history.
   useEffect(() => {
-    setMessages(previous => previous.map(message => message.id === 'welcome' ? {
+    updateMessages(messagesRef.current.map(message => message.id === 'welcome' ? {
       ...message,
-      text: lang === 'bn'
+      content: lang === 'bn'
         ? 'আসসালামু আলাইকুম 👋 আজ কোন কাজে মনোযোগ দিতে চান?'
         : 'Assalamu Alaikum 👋 What would you like help focusing on today?',
     } : message))
@@ -110,25 +114,26 @@ export function FocusoCompanion() {
     // Limit client-side prompt length to avoid excessive payload
     const safeContent = messageContent.slice(0, HUDHUD_INPUT_CHARS)
 
+    // Retrying the immediately failed message reuses its bubble, not its error notice.
+    const previous = messagesRef.current
+    const failedUser = previous.at(-2)
+    const retry = failedUser?.role === 'user' && failedUser.isNotice && failedUser.content === safeContent
+      && previous.at(-1)?.isNotice && previous.at(-1)?.role === 'assistant'
     const userMessage: Message = {
-      id: 'u_' + Date.now(),
+      id: retry ? failedUser.id : 'u_' + crypto.randomUUID(),
       role: 'user',
-      text: safeContent,
+      content: safeContent,
       createdAt: new Date().toISOString(),
+      pending: true,
     }
-
-    const updated = [...messages, userMessage]
+    const history = completedHudHudMessages(previous)
     nearBottomRef.current = true
-    appendMessage(userMessage)
+    updateMessages([...(retry ? previous.slice(0, -2) : previous), userMessage])
     setInput('')
     setLoading(true)
 
     try {
-      // Keep five recent exchanges and the current message. UI greetings and
-      // failures are never sent as authoritative assistant responses.
-      const payloadMessages = recentHudHudContext(updated
-        .filter((m) => !m.isNotice && m.id !== 'welcome')
-        .map((m) => ({ role: m.role, text: m.text })))
+      const payloadMessages = recentHudHudContext(history, userMessage)
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -140,46 +145,42 @@ export function FocusoCompanion() {
       const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
-        if (response.status === 429 || data.rateLimited || data.quotaExceeded) {
-          const limitMsg: Message = {
-            id: 'limit_' + Date.now(),
-            role: 'model',
-            isNotice: true,
-            text:
-              lang === 'bn'
-                ? 'হুদহুদ এখন সাময়িকভাবে ব্যস্ত। একটু পর আবার চেষ্টা করুন।'
-                : 'HudHud is temporarily unavailable. Please try again in a few moments.',
-            createdAt: new Date().toISOString(),
-          }
-          setMessages(previous => previous.map(message => message.id === userMessage.id ? { ...message, isNotice: true } : message))
-          appendMessage(limitMsg)
-          return
-        }
-        throw new Error(data.error || 'Failed to get response.')
+        // Provider details are intentionally not rendered. Only quota/rate uses the busy notice.
+        throw new Error(response.status === 429 ? 'rate_limited' : 'unavailable')
       }
 
-      if (typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('Empty reply')
+      if (typeof data.reply !== 'string' || !data.reply.trim() || data.reply.length > HUDHUD_REPLY_CHARS) throw new Error('Empty reply')
       const companionMessage: Message = {
-        id: 'm_' + Date.now(),
-        role: 'model',
-        text: data.reply,
+        id: 'm_' + crypto.randomUUID(),
+        role: 'assistant',
+        content: data.reply.trim(),
         createdAt: new Date().toISOString(),
       }
 
-      appendMessage(companionMessage)
+      updateMessages([
+        ...messagesRef.current.map(message => message.id === userMessage.id ? { ...message, pending: false } : message),
+        companionMessage,
+      ])
     } catch (err: unknown) {
-      setMessages(previous => previous.map(message => message.id === userMessage.id ? { ...message, isNotice: true } : message))
+      const rateLimited = err instanceof Error && err.message === 'rate_limited'
       const errorMsg: Message = {
-        id: 'err_' + Date.now(),
-        role: 'model',
+        id: 'err_' + crypto.randomUUID(),
+        role: 'assistant',
         isNotice: true,
-        text:
-          lang === 'bn'
+        content: rateLimited
+          ? lang === 'bn'
+            ? 'হুদহুদ এখন সাময়িকভাবে ব্যস্ত। একটু পর আবার চেষ্টা করুন।'
+            : 'HudHud is temporarily unavailable. Please try again in a few moments.'
+          : lang === 'bn'
             ? 'হুদহুদ এখন সংযোগ করতে পারছে না। অনুগ্রহ করে একটু পর আবার চেষ্টা করুন।'
             : 'HudHud couldn’t connect right now. Please try again in a moment.',
         createdAt: new Date().toISOString(),
       }
-      appendMessage(errorMsg)
+      updateMessages([
+        ...messagesRef.current.map(message => message.id === userMessage.id ? { ...message, pending: false, isNotice: true } : message),
+        errorMsg,
+      ])
+      setInput(safeContent)
     } finally {
       sendingRef.current = false
       setLoading(false)
@@ -250,7 +251,7 @@ export function FocusoCompanion() {
                           : 'bg-white text-ink border-ink-15'
                       }`}
                     >
-                      <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.text}</p>
+                      <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{m.content}</p>
                     </div>
                     {m.createdAt && (
                       <span className="text-[10px] text-ink-45 mt-1 px-1">

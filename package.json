@@ -15,7 +15,6 @@
     "validate": "tsc --noEmit && vite build && tsx server/domain/pricing.test.ts && tsx server/test/integrationGuard.test.ts && tsx server/services/adminReturnRefund.test.ts && tsx server/services/hudhudChat.test.ts"
   },
   "dependencies": {
-    "@google/genai": "^2.24.0",
     "@supabase/supabase-js": "^2.117.1",
     "express": "^5.2.1",
     "helmet": "^8.3.0",

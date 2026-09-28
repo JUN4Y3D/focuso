@@ -22,7 +22,7 @@ async function runStep9ATests() {
   // --------------------------------------------------------------------------
   console.log('\n--- 1. Testing Environment Variable Validation ---')
   const envResult = validateServerEnvironment()
-  if (!envResult.supabaseUrl || !envResult.supabaseSecretKey || !envResult.geminiApiKey || !envResult.bkashSendMoneyNumber) {
+  if (!envResult.supabaseUrl || !envResult.supabaseSecretKey || !envResult.cloudflareAccountId || !envResult.cloudflareApiToken || !envResult.bkashSendMoneyNumber) {
     throw new Error('validateServerEnvironment failed to return required configuration.')
   }
   console.log('✓ Server environment variables validated safely at startup without leaking secrets.')
@@ -66,16 +66,16 @@ async function runStep9ATests() {
 
   const distFiles = walk('dist')
   const secretKey = process.env.SUPABASE_SECRET_KEY
-  const geminiKey = process.env.GEMINI_API_KEY
+  const cloudflareToken = process.env.CLOUDFLARE_API_TOKEN
+  const cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID
 
   for (const file of distFiles) {
     const content = fs.readFileSync(file, 'utf-8')
     if (secretKey && content.includes(secretKey)) {
       throw new Error(`LEAK DETECTED: SUPABASE_SECRET_KEY found in ${file}`)
     }
-    if (geminiKey && content.includes(geminiKey)) {
-      throw new Error(`LEAK DETECTED: GEMINI_API_KEY found in ${file}`)
-    }
+    if (cloudflareToken && content.includes(cloudflareToken)) throw new Error(`LEAK DETECTED: CLOUDFLARE_API_TOKEN found in ${file}`)
+    if (cloudflareAccountId && content.includes(cloudflareAccountId)) throw new Error(`LEAK DETECTED: CLOUDFLARE_ACCOUNT_ID found in ${file}`)
     if (content.includes('service_role')) {
       throw new Error(`LEAK DETECTED: service_role key name found in ${file}`)
     }

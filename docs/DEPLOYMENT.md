@@ -31,7 +31,8 @@ Do not sort these files alphabetically. Several migrations share the same date p
 
 - `SUPABASE_URL`: Supabase project URL used by the privileged server client.
 - `SUPABASE_SECRET_KEY`: Supabase server secret/service-role credential. Never expose it to browser code.
-- `GEMINI_API_KEY`: server-side Gemini credential for the FOCUSO Companion.
+- `CLOUDFLARE_ACCOUNT_ID`: Cloudflare account ID for HudHud Workers AI (32 hexadecimal characters).
+- `CLOUDFLARE_API_TOKEN`: account-scoped Workers AI token for HudHud. Never expose it to browser code.
 - `BKASH_SEND_MONEY_NUMBER`: manual bKash Send Money destination displayed to customers.
 
 ## Required browser/build variables
@@ -39,7 +40,14 @@ Do not sort these files alphabetically. Several migrations share the same date p
 - `VITE_SUPABASE_URL`: Supabase project URL for browser-side admin authentication only.
 - `VITE_SUPABASE_PUBLISHABLE_KEY`: browser-safe Supabase publishable key for admin authentication only.
 
-These `VITE_` values are embedded at build time. Do not place server secrets or the Gemini key in any `VITE_` variable.
+These `VITE_` values are embedded at build time. Do not place server secrets or either Cloudflare AI value in any `VITE_` variable.
+
+HudHud now uses only `@cf/zai-org/glm-4.7-flash` via server-side Cloudflare REST.
+The old Gemini SDK and key are not required. Configure the two Cloudflare values
+for both Preview and Production before deploying this revision: the existing
+startup validator fails fast if required server configuration is absent. See
+[HudHud setup and acceptance tests](HUDHUD_CLOUDFLARE.md) for least-permission token
+setup, error codes, session privacy and the Preview-only test plan.
 
 ## Runtime configuration
 

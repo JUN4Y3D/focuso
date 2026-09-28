@@ -33,7 +33,8 @@ async function runStep7TestSuite() {
     // Verify no secret leak
     assert.equal(configData.supabaseKey, undefined)
     assert.equal(configData.secretKey, undefined)
-    assert.equal(configData.geminiApiKey, undefined)
+    assert.equal(configData.cloudflareApiToken, undefined)
+    assert.equal(configData.cloudflareAccountId, undefined)
     console.log('✓ Test 0 Passed: /api/payment-config returned public info safely.')
 
     // -------------------------------------------------------------------------

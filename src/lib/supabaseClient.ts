@@ -7,7 +7,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
  * - Uses ONLY browser-safe public variables:
  *   - VITE_SUPABASE_URL
  *   - VITE_SUPABASE_PUBLISHABLE_KEY
- * - NEVER imports SUPABASE_SECRET_KEY, GEMINI_API_KEY, or server-only credentials.
+ * - NEVER imports SUPABASE_SECRET_KEY, Cloudflare AI credentials, or other server-only credentials.
  * - Used strictly for admin Supabase Auth (signInWithPassword, signOut, getSession, onAuthStateChange).
  * - Customer store users remain pure guest checkouts without accounts or sessions.
  */
