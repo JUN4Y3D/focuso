@@ -326,10 +326,6 @@ export function FocusoCompanion() {
                 <IconArrow className="w-4 h-4" />
               </button>
             </form>
-            <a href="/audio/hudhud-call-license.html" target="_blank" rel="noopener noreferrer"
-              className="text-[10px] text-ink-60 underline underline-offset-2 px-4 pb-2 w-fit">
-              {lang === 'bn' ? 'পাখির ডাকের কৃতিত্ব' : 'Bird call credit'}
-            </a>
           </dialog>
       )}
     </>

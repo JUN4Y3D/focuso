@@ -6,7 +6,7 @@ import {
   recentHudHudContext,
 } from '../../src/lib/hudhudConversation.js'
 
-export const CHAT_MODEL = 'gemini-3.8-flash'
+export const CHAT_MODEL = 'gemini-3.5-flash-lite'
 export const MAX_OUTPUT_TOKENS = 350
 
 const messageSchema = z.discriminatedUnion('role', [

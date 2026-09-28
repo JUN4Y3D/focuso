@@ -47,7 +47,7 @@ for (const prompt of [...english, ...bangla]) {
   const response = await generateHudHudReply(body, 'offline-key')
   assert.equal(calls, before + 1)
   assert.equal(response.reply, answer)
-  assert.equal(response.model, 'gemini-3.8-flash')
+  assert.equal(response.model, 'gemini-3.5-flash-lite')
   assert.equal(requestBody.contents.at(-1).parts[0].text, prompt)
   assert.equal(requestBody.contents[1].parts[0].text, body.messages[1].text)
   assert.equal(requestBody.generationConfig.maxOutputTokens, 350)

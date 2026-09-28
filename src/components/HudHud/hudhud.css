@@ -65,7 +65,7 @@
 .hudhud-dialog > header button { margin-left: auto; min-width: 44px; min-height: 44px; display: grid; place-items: center; }
 .hudhud-dialog input { min-width: 0; font-size: 16px; }
 .hudhud-dialog form { padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); }
-.hudhud-dialog > form, .hudhud-dialog > a, .hudhud-dialog > .hudhud-suggestions { flex-shrink: 0; }
+.hudhud-dialog > form, .hudhud-dialog > .hudhud-suggestions { flex-shrink: 0; }
 .hudhud-dialog button[type='submit'] { min-width: 44px; min-height: 44px; }
 .hudhud-starters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .hudhud-starters button { min-height: 40px; text-align: left; font-size: 12px; line-height: 1.5; padding: 8px 10px; border: 1px solid rgba(40,94,73,.16); border-radius: 5px; background: white; }

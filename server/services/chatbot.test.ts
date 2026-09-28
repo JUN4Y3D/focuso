@@ -2,8 +2,8 @@
  * FOCUSO Chatbot Model & Functionality Verification Suite
  *
  * Verifies:
- * 1. Configured model is strictly 'gemini-3.8-flash'
- * 2. Response returns model: 'gemini-3.8-flash'
+ * 1. Configured model is strictly 'gemini-3.5-flash-lite'
+ * 2. Response returns model: 'gemini-3.5-flash-lite'
  * 3. No fallback to other models
  * 4. Input validation and edge cases
  * 5. Rate limiting integrity
@@ -60,10 +60,10 @@ async function runChatbotTests() {
   console.log('\nExact configured model returned by API:', data.model)
   assert.equal(
     data.model,
-    'gemini-3.8-flash',
-    `Expected model to be gemini-3.8-flash, but received ${data.model}`
+    'gemini-3.5-flash-lite',
+    `Expected model to be gemini-3.5-flash-lite, but received ${data.model}`
   )
-  console.log('✓ Model check passed: Response explicitly confirmed gemini-3.8-flash')
+  console.log('✓ Model check passed: Response explicitly confirmed gemini-3.5-flash-lite')
 
   // 2. Test Invalid / Empty Message Handling
   console.log('\n--- 2. Testing input validation on /api/chat ---')
@@ -103,7 +103,7 @@ async function runChatbotTests() {
   assert.ok(hitRateLimit, 'Rate limit should be triggered within 10 requests from the same IP')
 
   console.log('\n===============================================================')
-  console.log('ALL CHATBOT TESTS PASSED: Model is strictly gemini-3.8-flash')
+  console.log('ALL CHATBOT TESTS PASSED: Model is strictly gemini-3.5-flash-lite')
   console.log('===============================================================')
 }
 
