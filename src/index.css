@@ -143,6 +143,9 @@ html[data-lang='bn'] .wordmark-en { letter-spacing: 0.02em !important; }
 .storefront-checkout form button[type='submit'] { min-height: 48px; border-radius: 5px; }
 .storefront-checkout header button, .storefront-confirmation header button { min-height: 44px; }
 .storefront-checkout main { padding-bottom: 100px; }
+/* Invalid fields already have a high-contrast error border. Suppress the
+   global green focus outline so an active invalid input has one clear state. */
+.storefront-checkout [aria-invalid='true']:focus-visible { outline: none; }
 @media (max-width: 480px) {
   .storefront-checkout header .focuso-container { height: auto; min-height: 76px; gap: 12px; flex-wrap: wrap; padding-block: 8px; }
   .storefront-checkout header .focuso-container > div { gap: 12px; }
