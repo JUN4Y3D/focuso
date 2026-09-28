@@ -1,4 +1,4 @@
-import { getSupabaseAdmin } from '../lib/supabaseAdmin'
+import { getSupabaseAdmin } from '../lib/supabaseAdmin.js'
 
 export class MutationConflictError extends Error {
   public readonly statusCode: number = 409

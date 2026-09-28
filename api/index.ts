@@ -1,6 +1,6 @@
 // Vercel Function entrypoint for the existing Express API.
-// Keep the extension explicit: this project also has a server/ directory, and
-// extensionless ESM resolution on Vercel would otherwise target that directory.
-import app from '../server.ts'
+// The app module is inside server/, so Vercel traces and emits it with its
+// dependency graph; the root server.ts remains local-listener bootstrap only.
+import app from '../server/app.js'
 
 export default app

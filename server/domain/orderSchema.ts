@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { BANGLADESH_DISTRICTS } from '../../src/lib/districts'
+import { BANGLADESH_DISTRICTS } from '../../src/lib/districts.js'
 
 // Canonical list of valid Bangladesh district values
 export const VALID_DISTRICTS = BANGLADESH_DISTRICTS.map((d) => d.value)

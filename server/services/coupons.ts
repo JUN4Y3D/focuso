@@ -1,5 +1,5 @@
-import { getSupabaseAdmin } from '../lib/supabaseAdmin'
-import { PRICING_CONFIG } from '../domain/pricing'
+import { getSupabaseAdmin } from '../lib/supabaseAdmin.js'
+import { PRICING_CONFIG } from '../domain/pricing.js'
 
 export type CouponInvalidReason =
   | 'not_found'

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-import { getSupabaseAdmin } from '../lib/supabaseAdmin'
+import { getSupabaseAdmin } from '../lib/supabaseAdmin.js'
 
 export interface AuthenticatedAdmin {
   id: string

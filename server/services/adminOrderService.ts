@@ -1,5 +1,5 @@
-import { getSupabaseAdmin } from '../lib/supabaseAdmin'
-import { VALID_DISTRICTS } from '../domain/orderSchema'
+import { getSupabaseAdmin } from '../lib/supabaseAdmin.js'
+import { VALID_DISTRICTS } from '../domain/orderSchema.js'
 
 export interface AdminOrderListItem {
   id: string

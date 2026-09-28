@@ -1,16 +1,16 @@
 import crypto from 'node:crypto'
-import { getSupabaseAdmin } from '../lib/supabaseAdmin'
-import { calculateBasePricing } from '../domain/pricing'
+import { getSupabaseAdmin } from '../lib/supabaseAdmin.js'
+import { calculateBasePricing } from '../domain/pricing.js'
 import {
   validateAndCalculateCoupon,
   normalizeCouponCode,
-} from './coupons'
+} from './coupons.js'
 import {
   CreateOrderRequest,
   normalizeBangladeshPhone,
   maskPhoneForLogs,
   normalizeBkashTrxId,
-} from '../domain/orderSchema'
+} from '../domain/orderSchema.js'
 
 export interface OrderConfirmationResponse {
   orderNumber: string
